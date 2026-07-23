@@ -2,7 +2,7 @@ export interface UsageWindow {
   id: 'five_hour' | 'weekly'
   label: string
   percentUsed: number
-  resetsAt: string
+  resetsAt: string | null
 }
 
 export interface UsageState {
