@@ -1,38 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { DatabaseSync } from 'node:sqlite'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
-import type { PlanLimitsConfig } from '../src/providers/claude-code/planLimits'
 
 let dir: string
-let dbPath: string
+let cachePath: string
 let claudeJsonPath: string
-
-const planLimitsConfig: PlanLimitsConfig = {
-  defaultTier: 'claude_pro',
-  tiers: {
-    claude_pro: { five_hour: 1000, weekly: 10000 },
-    claude_max_5x: { five_hour: 5000, weekly: 50000 },
-  },
-}
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-provider-test-'))
-  dbPath = path.join(dir, 'usage.db')
+  cachePath = path.join(dir, 'token-pulse-cache.json')
   claudeJsonPath = path.join(dir, 'claude.json')
-
-  const db = new DatabaseSync(dbPath)
-  db.exec(`
-    CREATE TABLE turns (
-      timestamp TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER,
-      cache_read_tokens INTEGER, cache_creation_tokens INTEGER
-    )
-  `)
-  db.exec(`INSERT INTO turns VALUES ('2026-07-23T11:00:00.000Z', 'claude-sonnet-5', 100, 100, 0, 0)`)
-  db.close()
-
   fs.writeFileSync(claudeJsonPath, JSON.stringify({ oauthAccount: { organizationType: 'claude_max_5x' } }))
 })
 
@@ -42,30 +21,55 @@ afterEach(() => {
 
 describe('ClaudeCodeProvider', () => {
   it('reads the plan tier from claude.json', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, usageDbPath: dbPath, planLimitsConfig })
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
     expect(provider.getPlanTier()).toBe('claude_max_5x')
   })
 
   it('falls back to null when claude.json is missing', () => {
-    const provider = new ClaudeCodeProvider({
-      claudeJsonPath: path.join(dir, 'missing.json'),
-      usageDbPath: dbPath,
-      planLimitsConfig,
-    })
+    const provider = new ClaudeCodeProvider({ claudeJsonPath: path.join(dir, 'missing.json'), cachePath })
     expect(provider.getPlanTier()).toBeNull()
   })
 
-  it('reads the most recent model from usage.db', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, usageDbPath: dbPath, planLimitsConfig })
-    expect(provider.getCurrentModel()).toBe('claude-sonnet-5')
+  it('returns null cached usage when the cache file does not exist yet', () => {
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
+    expect(provider.getCachedUsage()).toBeNull()
   })
 
-  it('computes the five_hour window using the tier-specific limit', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, usageDbPath: dbPath, planLimitsConfig })
-    const now = new Date('2026-07-23T12:00:00.000Z')
-    const window = provider.getWindow('five_hour', now)
-    expect(window.usedTokens).toBe(200)
-    expect(window.limitTokens).toBe(5000)
-    expect(window.percentUsed).toBe(4)
+  it('reads both windows, model, and freshness from a real cache file', () => {
+    fs.writeFileSync(
+      cachePath,
+      JSON.stringify({
+        five_hour: { used_percentage: 15, resets_at: 1784850000 },
+        seven_day: { used_percentage: 52, resets_at: 1784950000 },
+        model_display_name: 'Sonnet 5',
+        updated_at: '2026-07-23T20:10:00Z',
+      })
+    )
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
+    const usage = provider.getCachedUsage()
+    expect(usage).not.toBeNull()
+    expect(usage!.currentModel).toBe('Sonnet 5')
+    expect(usage!.cacheUpdatedAt).toBe('2026-07-23T20:10:00Z')
+    expect(usage!.windows).toEqual([
+      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 15, resetsAt: new Date(1784850000 * 1000).toISOString() },
+      { id: 'weekly', label: 'Weekly', percentUsed: 52, resetsAt: new Date(1784950000 * 1000).toISOString() },
+    ])
+  })
+
+  it('omits a window whose rate-limit data is null in the cache', () => {
+    fs.writeFileSync(
+      cachePath,
+      JSON.stringify({
+        five_hour: { used_percentage: 15, resets_at: 1784850000 },
+        seven_day: null,
+        model_display_name: null,
+        updated_at: '2026-07-23T20:10:00Z',
+      })
+    )
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
+    const usage = provider.getCachedUsage()
+    expect(usage!.windows).toHaveLength(1)
+    expect(usage!.windows[0].id).toBe('five_hour')
+    expect(usage!.currentModel).toBeNull()
   })
 })
