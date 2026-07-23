@@ -9,9 +9,11 @@ export interface PlanLimitsConfig {
   tiers: Record<string, PlanLimits>
 }
 
+const SAFETY_FALLBACK: PlanLimits = { five_hour: 200000, weekly: 2000000 }
+
 export function getLimitsForTier(config: PlanLimitsConfig, tier: string | null): PlanLimits {
   if (tier && config.tiers[tier]) {
     return config.tiers[tier]
   }
-  return config.tiers[config.defaultTier]
+  return config.tiers[config.defaultTier] ?? SAFETY_FALLBACK
 }
