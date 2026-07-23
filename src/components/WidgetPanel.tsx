@@ -1,4 +1,5 @@
 import type { UsageState } from '../shared/types'
+import { formatRelativeTime } from '../shared/format'
 import { UsageBar } from './UsageBar'
 
 export function WidgetPanel({ state }: { state: UsageState | null }) {
@@ -11,21 +12,13 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
     <div className="widget-panel">
       <div className="widget-panel__header">
         <span>{state.currentModel ?? 'No recent activity'}</span>
-        <span className="widget-panel__tier">{state.planTier}</span>
-        <button
-          className="widget-panel__reveal-config"
-          onClick={() =>
-            window.ipcRenderer
-              .invoke('config:reveal')
-              .catch((err: unknown) => console.error('Failed to reveal config file', err))
-          }
-          title="Open plan-limits.json"
-        >
-          ⚙
-        </button>
+        <span className="widget-panel__tier">{state.planTier ?? 'plan unknown'}</span>
       </div>
       {fiveHour && <UsageBar window={fiveHour} />}
       {weekly && <UsageBar window={weekly} />}
+      {state.windows.length === 0 && (
+        <div className="widget-panel__empty">No usage data yet — open a Claude Code session to populate this.</div>
+      )}
       <label className="widget-panel__autostart">
         <input
           type="checkbox"
@@ -38,6 +31,9 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
         />
         Start at login
       </label>
+      {state.cacheUpdatedAt && (
+        <div className="widget-panel__freshness">Data as of {formatRelativeTime(state.cacheUpdatedAt)}</div>
+      )}
     </div>
   )
 }

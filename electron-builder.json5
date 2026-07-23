@@ -9,11 +9,7 @@
   },
   "files": [
     "dist",
-    "dist-electron",
-    "config"
-  ],
-  "asarUnpack": [
-    "config/**"
+    "dist-electron"
   ],
   "mac": {
     "target": ["dmg"],

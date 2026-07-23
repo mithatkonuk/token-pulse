@@ -1,34 +1,47 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { computeWindow } from './windowCalc'
-import { readTurnsSince, readLatestModel } from './usageDb'
-import { getLimitsForTier, type PlanLimitsConfig } from './planLimits'
 import type { UsageWindow } from '../../shared/types'
 
-const FIVE_HOURS_MS = 5 * 60 * 60 * 1000
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+interface StatuslineRateLimit {
+  used_percentage: number
+  resets_at: number
+}
 
-const WINDOW_DEFS: Record<'five_hour' | 'weekly', { label: string; durationMs: number }> = {
-  five_hour: { label: 'Every 5 hours', durationMs: FIVE_HOURS_MS },
-  weekly: { label: 'Weekly', durationMs: SEVEN_DAYS_MS },
+interface StatuslineCache {
+  five_hour: StatuslineRateLimit | null
+  seven_day: StatuslineRateLimit | null
+  model_display_name: string | null
+  updated_at: string
+}
+
+export interface CachedUsage {
+  windows: UsageWindow[]
+  currentModel: string | null
+  cacheUpdatedAt: string | null
 }
 
 export interface ClaudeCodeProviderOptions {
   claudeJsonPath?: string
-  usageDbPath?: string
-  planLimitsConfig: PlanLimitsConfig
+  cachePath?: string
+}
+
+function toUsageWindow(id: 'five_hour' | 'weekly', label: string, rateLimit: StatuslineRateLimit): UsageWindow {
+  return {
+    id,
+    label,
+    percentUsed: rateLimit.used_percentage,
+    resetsAt: new Date(rateLimit.resets_at * 1000).toISOString(),
+  }
 }
 
 export class ClaudeCodeProvider {
   private readonly claudeJsonPath: string
-  private readonly usageDbPath: string
-  private readonly planLimitsConfig: PlanLimitsConfig
+  private readonly cachePath: string
 
-  constructor(options: ClaudeCodeProviderOptions) {
+  constructor(options: ClaudeCodeProviderOptions = {}) {
     this.claudeJsonPath = options.claudeJsonPath ?? path.join(os.homedir(), '.claude.json')
-    this.usageDbPath = options.usageDbPath ?? path.join(os.homedir(), '.claude', 'usage.db')
-    this.planLimitsConfig = options.planLimitsConfig
+    this.cachePath = options.cachePath ?? path.join(os.homedir(), '.claude', 'token-pulse-cache.json')
   }
 
   getPlanTier(): string | null {
@@ -41,33 +54,24 @@ export class ClaudeCodeProvider {
     }
   }
 
-  getCurrentModel(): string | null {
+  getCachedUsage(): CachedUsage | null {
+    let cache: StatuslineCache
     try {
-      return readLatestModel(this.usageDbPath)
+      cache = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8')) as StatuslineCache
     } catch {
       return null
     }
-  }
-
-  getWindow(id: 'five_hour' | 'weekly', now: Date = new Date()): UsageWindow {
-    const def = WINDOW_DEFS[id]
-    const limits = getLimitsForTier(this.planLimitsConfig, this.getPlanTier())
-    let turns: ReturnType<typeof readTurnsSince> = []
-    try {
-      const since = new Date(now.getTime() - def.durationMs).toISOString()
-      turns = readTurnsSince(this.usageDbPath, since)
-    } catch {
-      turns = []
+    const windows: UsageWindow[] = []
+    if (cache.five_hour) {
+      windows.push(toUsageWindow('five_hour', 'Every 5 hours', cache.five_hour))
     }
-    const { usedTokens, resetsAt } = computeWindow(turns, def.durationMs, now)
-    const limitTokens = id === 'five_hour' ? limits.five_hour : limits.weekly
+    if (cache.seven_day) {
+      windows.push(toUsageWindow('weekly', 'Weekly', cache.seven_day))
+    }
     return {
-      id,
-      label: def.label,
-      usedTokens,
-      limitTokens,
-      percentUsed: limitTokens > 0 ? (usedTokens / limitTokens) * 100 : 0,
-      resetsAt: resetsAt.toISOString(),
+      windows,
+      currentModel: cache.model_display_name ?? null,
+      cacheUpdatedAt: cache.updated_at ?? null,
     }
   }
 }
