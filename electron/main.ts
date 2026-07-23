@@ -1,12 +1,14 @@
-import { app } from 'electron'
+import { app, ipcMain } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTray, updateTrayIcon } from './tray'
 import { togglePopup, getPopupIfExists } from './windowManager'
+import { setStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import type { PlanLimitsConfig } from '../src/providers/claude-code/planLimits'
 import type { UsageState } from '../src/shared/types'
+import { readSettings, writeSettings } from '../src/main/settingsStore'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -14,6 +16,7 @@ process.env.APP_ROOT = path.join(__dirname, '..')
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 const PRELOAD_PATH = path.join(__dirname, 'preload.mjs')
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 
 const FIVE_HOUR_POLL_MS = 5 * 1000
 const WEEKLY_POLL_MS = 6 * 60 * 60 * 1000
@@ -29,7 +32,7 @@ let state: UsageState = {
   currentModel: null,
   windows: [provider.getWindow('five_hour'), provider.getWindow('weekly')],
   updatedAt: new Date().toISOString(),
-  startAtLogin: false,
+  startAtLogin: readSettings(SETTINGS_PATH).startAtLogin,
 }
 
 function pushState(): void {
@@ -55,6 +58,13 @@ function pollWeekly(): void {
   }
   pushState()
 }
+
+ipcMain.handle('settings:setStartAtLogin', (_event, enabled: boolean) => {
+  writeSettings(SETTINGS_PATH, { startAtLogin: enabled })
+  setStartAtLogin(enabled)
+  state = { ...state, startAtLogin: enabled }
+  pushState()
+})
 
 app.whenReady().then(() => {
   createTray((trayRef) => {

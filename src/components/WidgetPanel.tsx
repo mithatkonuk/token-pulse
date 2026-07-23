@@ -15,6 +15,14 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
       </div>
       {fiveHour && <UsageBar window={fiveHour} />}
       {weekly && <UsageBar window={weekly} />}
+      <label className="widget-panel__autostart">
+        <input
+          type="checkbox"
+          checked={state.startAtLogin}
+          onChange={(e) => window.ipcRenderer.invoke('settings:setStartAtLogin', e.target.checked)}
+        />
+        Start at login
+      </label>
     </div>
   )
 }
