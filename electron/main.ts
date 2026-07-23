@@ -61,6 +61,9 @@ ipcMain.handle('settings:setStartAtLogin', (_event, enabled: boolean) => {
 })
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') {
+    app.dock?.hide()
+  }
   createTray((trayRef) => {
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
     pushState()
