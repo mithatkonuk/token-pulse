@@ -14,7 +14,7 @@ export function getOrCreatePopup(preloadPath: string, source: PopupSource): Brow
   }
   popup = new BrowserWindow({
     width: 320,
-    height: 260,
+    height: 220,
     backgroundColor: '#1c1c1e',
     show: false,
     frame: false,

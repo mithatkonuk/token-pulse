@@ -13,8 +13,9 @@ export function createTray(onClick: (tray: Tray) => void): Tray {
   if (process.platform === 'darwin') {
     tray.setTitle(formatTitle(0))
   }
+  const menu = Menu.buildFromTemplate([{ label: 'Quit', click: () => app.quit() }])
   tray.on('click', () => onClick(tray as Tray))
-  tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Quit', click: () => app.quit() }]))
+  tray.on('right-click', () => tray?.popUpContextMenu(menu))
   return tray
 }
 
