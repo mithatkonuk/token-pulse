@@ -12,6 +12,17 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
       <div className="widget-panel__header">
         <span>{state.currentModel ?? 'No recent activity'}</span>
         <span className="widget-panel__tier">{state.planTier}</span>
+        <button
+          className="widget-panel__reveal-config"
+          onClick={() =>
+            window.ipcRenderer
+              .invoke('config:reveal')
+              .catch((err: unknown) => console.error('Failed to reveal config file', err))
+          }
+          title="Open plan-limits.json"
+        >
+          ⚙
+        </button>
       </div>
       {fiveHour && <UsageBar window={fiveHour} />}
       {weekly && <UsageBar window={weekly} />}
@@ -19,7 +30,11 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
         <input
           type="checkbox"
           checked={state.startAtLogin}
-          onChange={(e) => window.ipcRenderer.invoke('settings:setStartAtLogin', e.target.checked)}
+          onChange={(e) =>
+            window.ipcRenderer
+              .invoke('settings:setStartAtLogin', e.target.checked)
+              .catch((err: unknown) => console.error('Failed to update start-at-login setting', err))
+          }
         />
         Start at login
       </label>

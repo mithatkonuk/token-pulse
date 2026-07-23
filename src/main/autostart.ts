@@ -3,7 +3,7 @@ export function buildLinuxAutostartEntry(execPath: string): string {
     '[Desktop Entry]',
     'Type=Application',
     'Name=token-pulse',
-    `Exec=${execPath}`,
+    `Exec="${execPath}"`,
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',
   ].join('\n')
