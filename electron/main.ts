@@ -1,30 +1,23 @@
-import { app, BrowserWindow } from 'electron'
+import { app } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createTray, updateTrayIcon } from './tray'
+import { togglePopup } from './windowManager'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+const PRELOAD_PATH = path.join(__dirname, 'preload.mjs')
 
-function createWindow(): void {
-  const win = new BrowserWindow({
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-    },
+app.whenReady().then(() => {
+  const tray = createTray((trayRef) => {
+    togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
   })
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
-  }
-}
-
-app.whenReady().then(createWindow)
+  updateTrayIcon(35)
+})
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // Intentionally do nothing — the app lives in the tray.
 })
