@@ -1,0 +1,9 @@
+{
+  "defaultTier": "claude_pro",
+  "notes": "Anthropic does not publish exact 5h/weekly token thresholds. These are rough community-estimated starting points, scaled from the Pro tier by each plan's advertised usage multiplier. Edit the numbers below once you've observed your own real limits.",
+  "tiers": {
+    "claude_pro": { "five_hour": 200000, "weekly": 2000000 },
+    "claude_max_5x": { "five_hour": 1000000, "weekly": 10000000 },
+    "claude_max_20x": { "five_hour": 4000000, "weekly": 40000000 }
+  }
+}
