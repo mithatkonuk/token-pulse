@@ -121,4 +121,41 @@ describe('ClaudeCodeProvider', () => {
     expect(() => provider().getCachedUsage()).not.toThrow()
     expect(provider().getCachedUsage()).toBeNull()
   })
+
+  it('skips a malformed non-tail sample instead of crashing (e.g. u: null)', () => {
+    fs.writeFileSync(
+      historyPath,
+      JSON.stringify({
+        version: 2,
+        samples: [
+          { t: 1000, org: 'org-a', u: null },
+          { t: 2000, org: 'org-a', u: { fh: 20, sd: 10 } },
+        ],
+      })
+    )
+    expect(() => provider().getCachedUsage()).not.toThrow()
+    const usage = provider().getCachedUsage()
+    expect(usage).not.toBeNull()
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.percentUsed).toBe(20)
+  })
+
+  it('picks the most recent reset event when there are multiple resets in history', () => {
+    fs.writeFileSync(
+      historyPath,
+      JSON.stringify({
+        version: 2,
+        samples: [
+          { t: 1000, org: 'org-a', u: { fh: 90, sd: 1 } },
+          { t: 2000, org: 'org-a', u: { fh: 10, sd: 1 } }, // first reset
+          { t: 3000, org: 'org-a', u: { fh: 50, sd: 1 } },
+          { t: 4000, org: 'org-a', u: { fh: 5, sd: 1 } }, // second (most recent) reset
+          { t: 5000, org: 'org-a', u: { fh: 15, sd: 1 } },
+        ],
+      })
+    )
+    const usage = provider().getCachedUsage()
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.resetsAt).toBe(new Date(4000 + 5 * 60 * 60 * 1000).toISOString())
+  })
 })

@@ -43,6 +43,16 @@ function defaultHistoryPath(home: string): string {
   return path.join(home, '.config', 'Claude', 'plan-usage-history.json')
 }
 
+function isValidSample(value: unknown): value is HistorySample {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as HistorySample).t === 'number' &&
+    typeof (value as HistorySample).u === 'object' &&
+    (value as HistorySample).u !== null
+  )
+}
+
 function findLastResetTime(samples: HistorySample[], key: 'fh' | 'sd'): number | null {
   let lastResetT: number | null = null
   for (let i = 1; i < samples.length; i++) {
@@ -130,15 +140,13 @@ export class ClaudeCodeProvider {
       return null
     }
 
+    const validSamples = file.samples.filter(isValidSample)
     const orgUuid = this.getCurrentOrgUuid()
-    const samples = orgUuid ? file.samples.filter((s) => !s.org || s.org === orgUuid) : file.samples
+    const samples = orgUuid ? validSamples.filter((s) => !s.org || s.org === orgUuid) : validSamples
     if (samples.length === 0) {
       return null
     }
     const latest = samples[samples.length - 1]
-    if (typeof latest.t !== 'number' || typeof latest.u !== 'object' || latest.u === null) {
-      return null
-    }
 
     const windows: UsageWindow[] = []
     const fiveHour = buildWindow('five_hour', 'Every 5 hours', 'fh', FIVE_HOURS_MS, samples, latest)
