@@ -72,4 +72,24 @@ describe('ClaudeCodeProvider', () => {
     expect(usage!.windows[0].id).toBe('five_hour')
     expect(usage!.currentModel).toBeNull()
   })
+
+  it('omits a window whose rate-limit field is present but malformed (missing resets_at), without throwing', () => {
+    fs.writeFileSync(
+      cachePath,
+      JSON.stringify({
+        five_hour: { used_percentage: 15 },
+        seven_day: { used_percentage: 52, resets_at: 1784950000 },
+        model_display_name: 'Sonnet 5',
+        updated_at: 12345,
+      })
+    )
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
+    let usage: ReturnType<typeof provider.getCachedUsage>
+    expect(() => {
+      usage = provider.getCachedUsage()
+    }).not.toThrow()
+    expect(usage!.windows).toHaveLength(1)
+    expect(usage!.windows[0].id).toBe('weekly')
+    expect(usage!.cacheUpdatedAt).toBeNull()
+  })
 })
