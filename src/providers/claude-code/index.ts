@@ -26,6 +26,15 @@ export interface ClaudeCodeProviderOptions {
   cachePath?: string
 }
 
+function isValidRateLimit(value: unknown): value is StatuslineRateLimit {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as StatuslineRateLimit).used_percentage === 'number' &&
+    typeof (value as StatuslineRateLimit).resets_at === 'number'
+  )
+}
+
 function toUsageWindow(id: 'five_hour' | 'weekly', label: string, rateLimit: StatuslineRateLimit): UsageWindow {
   return {
     id,
@@ -62,16 +71,16 @@ export class ClaudeCodeProvider {
       return null
     }
     const windows: UsageWindow[] = []
-    if (cache.five_hour) {
+    if (isValidRateLimit(cache.five_hour)) {
       windows.push(toUsageWindow('five_hour', 'Every 5 hours', cache.five_hour))
     }
-    if (cache.seven_day) {
+    if (isValidRateLimit(cache.seven_day)) {
       windows.push(toUsageWindow('weekly', 'Weekly', cache.seven_day))
     }
     return {
       windows,
       currentModel: cache.model_display_name ?? null,
-      cacheUpdatedAt: cache.updated_at ?? null,
+      cacheUpdatedAt: typeof cache.updated_at === 'string' ? cache.updated_at : null,
     }
   }
 }
