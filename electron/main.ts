@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,15 +21,37 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 const FIVE_HOUR_POLL_MS = 5 * 1000
 const WEEKLY_POLL_MS = 6 * 60 * 60 * 1000
 
-const planLimitsConfig = JSON.parse(
-  fs.readFileSync(path.join(process.env.APP_ROOT, 'config', 'plan-limits.json'), 'utf-8')
-) as PlanLimitsConfig
+const DEFAULT_PLAN_LIMITS_CONFIG: PlanLimitsConfig = {
+  defaultTier: 'claude_pro',
+  notes:
+    "Anthropic does not publish exact 5h/weekly token thresholds. These are rough community-estimated starting points, scaled from the Pro tier by each plan's advertised usage multiplier. Edit the numbers below once you've observed your own real limits.",
+  tiers: {
+    claude_pro: { five_hour: 200000, weekly: 2000000 },
+    claude_max_5x: { five_hour: 1000000, weekly: 10000000 },
+    claude_max_20x: { five_hour: 4000000, weekly: 40000000 },
+  },
+}
+
+const CONFIG_PATH = app.isPackaged
+  ? path.join(process.env.APP_ROOT, 'config', 'plan-limits.json').replace('app.asar', 'app.asar.unpacked')
+  : path.join(process.env.APP_ROOT, 'config', 'plan-limits.json')
+
+function loadPlanLimitsConfig(): PlanLimitsConfig {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as PlanLimitsConfig
+  } catch (err) {
+    console.error('Failed to read config/plan-limits.json, using built-in defaults:', err)
+    return DEFAULT_PLAN_LIMITS_CONFIG
+  }
+}
+
+const planLimitsConfig = loadPlanLimitsConfig()
 
 const provider = new ClaudeCodeProvider({ planLimitsConfig })
 
 let state: UsageState = {
   planTier: planLimitsConfig.defaultTier,
-  currentModel: null,
+  currentModel: provider.getCurrentModel(),
   windows: [provider.getWindow('five_hour'), provider.getWindow('weekly')],
   updatedAt: new Date().toISOString(),
   startAtLogin: readSettings(SETTINGS_PATH).startAtLogin,
@@ -44,7 +66,12 @@ function pushState(): void {
 }
 
 function pollFiveHour(): void {
-  state = { ...state, windows: [provider.getWindow('five_hour'), state.windows[1]], updatedAt: new Date().toISOString() }
+  state = {
+    ...state,
+    windows: [provider.getWindow('five_hour'), state.windows[1]],
+    currentModel: provider.getCurrentModel(),
+    updatedAt: new Date().toISOString(),
+  }
   pushState()
 }
 
@@ -52,18 +79,23 @@ function pollWeekly(): void {
   state = {
     ...state,
     planTier: provider.getPlanTier() ?? planLimitsConfig.defaultTier,
-    currentModel: provider.getCurrentModel(),
     windows: [state.windows[0], provider.getWindow('weekly')],
     updatedAt: new Date().toISOString(),
   }
   pushState()
 }
 
+ipcMain.handle('usage:get', () => state)
+
 ipcMain.handle('settings:setStartAtLogin', (_event, enabled: boolean) => {
   writeSettings(SETTINGS_PATH, { startAtLogin: enabled })
   setStartAtLogin(enabled)
   state = { ...state, startAtLogin: enabled }
   pushState()
+})
+
+ipcMain.handle('config:reveal', () => {
+  shell.showItemInFolder(CONFIG_PATH)
 })
 
 app.whenReady().then(() => {

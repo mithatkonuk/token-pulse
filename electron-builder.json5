@@ -12,6 +12,9 @@
     "dist-electron",
     "config"
   ],
+  "asarUnpack": [
+    "config/**"
+  ],
   "mac": {
     "target": ["dmg"],
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
