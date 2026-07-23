@@ -21,4 +21,14 @@ describe('getLimitsForTier', () => {
   it('falls back to the default tier when the tier is null', () => {
     expect(getLimitsForTier(config, null)).toEqual({ five_hour: 200000, weekly: 2000000 })
   })
+
+  it('falls back to a hardcoded safety default when defaultTier itself is missing from tiers', () => {
+    const brokenConfig: PlanLimitsConfig = {
+      defaultTier: 'does_not_exist',
+      tiers: {
+        claude_pro: { five_hour: 200000, weekly: 2000000 },
+      },
+    }
+    expect(getLimitsForTier(brokenConfig, null)).toEqual({ five_hour: 200000, weekly: 2000000 })
+  })
 })
