@@ -141,6 +141,26 @@ describe('ClaudeCodeProvider', () => {
     expect(fiveHour!.percentUsed).toBe(20)
   })
 
+  it('anchors resetsAt on the post-drop sample (not the midpoint) when the gap is large, e.g. app was asleep/closed', () => {
+    const FIVE_MIN = 5 * 60 * 1000
+    const gapStart = 1_000_000
+    const gapEnd = gapStart + 3 * 60 * 60 * 1000 // 3h gap — the app was asleep, pre-drop sample is stale
+    fs.writeFileSync(
+      historyPath,
+      JSON.stringify({
+        version: 2,
+        samples: [
+          { t: gapStart, org: 'org-a', u: { fh: 100, sd: 50 } },
+          { t: gapEnd, org: 'org-a', u: { fh: 0, sd: 50 } }, // resumed sampling right after the real reset
+          { t: gapEnd + FIVE_MIN, org: 'org-a', u: { fh: 10, sd: 50 } },
+        ],
+      })
+    )
+    const usage = provider().getCachedUsage()
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.resetsAt).toBe(new Date(gapEnd + 5 * 60 * 60 * 1000).toISOString())
+  })
+
   it('picks the most recent reset event when there are multiple resets in history', () => {
     fs.writeFileSync(
       historyPath,
