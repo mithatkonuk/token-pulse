@@ -5,98 +5,120 @@ import path from 'node:path'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 
 let dir: string
-let cachePath: string
+let historyPath: string
 let claudeJsonPath: string
+let statuslineCachePath: string
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-provider-test-'))
-  cachePath = path.join(dir, 'token-pulse-cache.json')
+  historyPath = path.join(dir, 'plan-usage-history.json')
   claudeJsonPath = path.join(dir, 'claude.json')
-  fs.writeFileSync(claudeJsonPath, JSON.stringify({ oauthAccount: { organizationType: 'claude_max_5x' } }))
+  statuslineCachePath = path.join(dir, 'token-pulse-cache.json')
+  fs.writeFileSync(
+    claudeJsonPath,
+    JSON.stringify({ oauthAccount: { organizationType: 'claude_max_5x', organizationUuid: 'org-a' } })
+  )
 })
 
 afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
+function provider() {
+  return new ClaudeCodeProvider({ claudeJsonPath, historyPath, statuslineCachePath })
+}
+
 describe('ClaudeCodeProvider', () => {
   it('reads the plan tier from claude.json', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    expect(provider.getPlanTier()).toBe('claude_max_5x')
+    expect(provider().getPlanTier()).toBe('claude_max_5x')
   })
 
   it('falls back to null when claude.json is missing', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath: path.join(dir, 'missing.json'), cachePath })
-    expect(provider.getPlanTier()).toBeNull()
+    const p = new ClaudeCodeProvider({ claudeJsonPath: path.join(dir, 'missing.json'), historyPath, statuslineCachePath })
+    expect(p.getPlanTier()).toBeNull()
   })
 
-  it('returns null cached usage when the cache file does not exist yet', () => {
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    expect(provider.getCachedUsage()).toBeNull()
+  it('returns null cached usage when the history file does not exist', () => {
+    expect(provider().getCachedUsage()).toBeNull()
   })
 
-  it('reads both windows, model, and freshness from a real cache file', () => {
+  it('returns the latest sample as current percentages, with resetsAt null when no reset event is in history', () => {
     fs.writeFileSync(
-      cachePath,
+      historyPath,
       JSON.stringify({
-        five_hour: { used_percentage: 15, resets_at: 1784850000 },
-        seven_day: { used_percentage: 52, resets_at: 1784950000 },
-        model_display_name: 'Sonnet 5',
-        updated_at: '2026-07-23T20:10:00Z',
+        version: 2,
+        samples: [
+          { t: 1000, org: 'org-a', u: { fh: 10, sd: 5 } },
+          { t: 2000, org: 'org-a', u: { fh: 20, sd: 6 } },
+          { t: 3000, org: 'org-a', u: { fh: 30, sd: 7 } },
+        ],
       })
     )
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    const usage = provider.getCachedUsage()
+    const usage = provider().getCachedUsage()
     expect(usage).not.toBeNull()
-    expect(usage!.currentModel).toBe('Sonnet 5')
-    expect(usage!.cacheUpdatedAt).toBe('2026-07-23T20:10:00Z')
-    expect(usage!.windows).toEqual([
-      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 15, resetsAt: new Date(1784850000 * 1000).toISOString() },
-      { id: 'weekly', label: 'Weekly', percentUsed: 52, resetsAt: new Date(1784950000 * 1000).toISOString() },
-    ])
+    expect(usage!.cacheUpdatedAt).toBe(new Date(3000).toISOString())
+    expect(usage!.windows).toHaveLength(2)
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.percentUsed).toBe(30)
+    expect(fiveHour!.resetsAt).toBeNull()
   })
 
-  it('omits a window whose rate-limit data is null in the cache', () => {
+  it('approximates resetsAt as the last reset event time plus the window duration', () => {
     fs.writeFileSync(
-      cachePath,
+      historyPath,
       JSON.stringify({
-        five_hour: { used_percentage: 15, resets_at: 1784850000 },
-        seven_day: null,
-        model_display_name: null,
-        updated_at: '2026-07-23T20:10:00Z',
+        version: 2,
+        samples: [
+          { t: 1000, org: 'org-a', u: { fh: 90, sd: 50 } },
+          { t: 2000, org: 'org-a', u: { fh: 5, sd: 51 } }, // fh reset here
+          { t: 3000, org: 'org-a', u: { fh: 15, sd: 52 } },
+        ],
       })
     )
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    const usage = provider.getCachedUsage()
-    expect(usage!.windows).toHaveLength(1)
-    expect(usage!.windows[0].id).toBe('five_hour')
+    const usage = provider().getCachedUsage()
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.percentUsed).toBe(15)
+    expect(fiveHour!.resetsAt).toBe(new Date(2000 + 5 * 60 * 60 * 1000).toISOString())
+  })
+
+  it('filters samples to the current org when org info is present', () => {
+    fs.writeFileSync(
+      historyPath,
+      JSON.stringify({
+        version: 2,
+        samples: [
+          { t: 1000, org: 'org-a', u: { fh: 10, sd: 5 } },
+          { t: 2000, org: 'org-b', u: { fh: 99, sd: 99 } }, // different org, must be ignored
+        ],
+      })
+    )
+    const usage = provider().getCachedUsage()
+    const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
+    expect(fiveHour!.percentUsed).toBe(10)
+  })
+
+  it('reads the current model from the statusline cache as a best-effort label', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    fs.writeFileSync(statuslineCachePath, JSON.stringify({ model_display_name: 'Sonnet 5' }))
+    const usage = provider().getCachedUsage()
+    expect(usage!.currentModel).toBe('Sonnet 5')
+  })
+
+  it('returns null current model when the statusline cache is missing', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    const usage = provider().getCachedUsage()
     expect(usage!.currentModel).toBeNull()
   })
 
-  it('omits a window whose rate-limit field is present but malformed (missing resets_at), without throwing', () => {
-    fs.writeFileSync(
-      cachePath,
-      JSON.stringify({
-        five_hour: { used_percentage: 15 },
-        seven_day: { used_percentage: 52, resets_at: 1784950000 },
-        model_display_name: 'Sonnet 5',
-        updated_at: 12345,
-      })
-    )
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    let usage: ReturnType<typeof provider.getCachedUsage>
-    expect(() => {
-      usage = provider.getCachedUsage()
-    }).not.toThrow()
-    expect(usage!.windows).toHaveLength(1)
-    expect(usage!.windows[0].id).toBe('weekly')
-    expect(usage!.cacheUpdatedAt).toBeNull()
+  it('returns null when the history file contains the JSON literal null (crash-safety)', () => {
+    fs.writeFileSync(historyPath, 'null')
+    expect(() => provider().getCachedUsage()).not.toThrow()
+    expect(provider().getCachedUsage()).toBeNull()
   })
 
-  it('returns null when the cache file contains the JSON literal null', () => {
-    fs.writeFileSync(cachePath, 'null')
-    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
-    expect(() => provider.getCachedUsage()).not.toThrow()
-    expect(provider.getCachedUsage()).toBeNull()
+  it('returns null when samples is missing or not an array (crash-safety)', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2 }))
+    expect(() => provider().getCachedUsage()).not.toThrow()
+    expect(provider().getCachedUsage()).toBeNull()
   })
 })

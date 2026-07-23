@@ -3,16 +3,22 @@ import os from 'node:os'
 import path from 'node:path'
 import type { UsageWindow } from '../../shared/types'
 
-interface StatuslineRateLimit {
-  used_percentage: number
-  resets_at: number
+const FIVE_HOURS_MS = 5 * 60 * 60 * 1000
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+
+interface HistorySample {
+  t: number
+  org?: string
+  u: { fh?: number; sd?: number }
+}
+
+interface UsageHistoryFile {
+  version: number
+  samples: HistorySample[]
 }
 
 interface StatuslineCache {
-  five_hour: StatuslineRateLimit | null
-  seven_day: StatuslineRateLimit | null
-  model_display_name: string | null
-  updated_at: string
+  model_display_name?: unknown
 }
 
 export interface CachedUsage {
@@ -23,34 +29,63 @@ export interface CachedUsage {
 
 export interface ClaudeCodeProviderOptions {
   claudeJsonPath?: string
-  cachePath?: string
+  historyPath?: string
+  statuslineCachePath?: string
 }
 
-function isValidRateLimit(value: unknown): value is StatuslineRateLimit {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as StatuslineRateLimit).used_percentage === 'number' &&
-    typeof (value as StatuslineRateLimit).resets_at === 'number'
-  )
+function defaultHistoryPath(home: string): string {
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Claude', 'plan-usage-history.json')
+  }
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming'), 'Claude', 'plan-usage-history.json')
+  }
+  return path.join(home, '.config', 'Claude', 'plan-usage-history.json')
 }
 
-function toUsageWindow(id: 'five_hour' | 'weekly', label: string, rateLimit: StatuslineRateLimit): UsageWindow {
+function findLastResetTime(samples: HistorySample[], key: 'fh' | 'sd'): number | null {
+  let lastResetT: number | null = null
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1].u[key]
+    const cur = samples[i].u[key]
+    if (typeof prev === 'number' && typeof cur === 'number' && cur < prev) {
+      lastResetT = samples[i].t
+    }
+  }
+  return lastResetT
+}
+
+function buildWindow(
+  id: 'five_hour' | 'weekly',
+  label: string,
+  key: 'fh' | 'sd',
+  durationMs: number,
+  samples: HistorySample[],
+  latest: HistorySample
+): UsageWindow | null {
+  const percentUsed = latest.u[key]
+  if (typeof percentUsed !== 'number') {
+    return null
+  }
+  const resetT = findLastResetTime(samples, key)
   return {
     id,
     label,
-    percentUsed: rateLimit.used_percentage,
-    resetsAt: new Date(rateLimit.resets_at * 1000).toISOString(),
+    percentUsed,
+    resetsAt: resetT !== null ? new Date(resetT + durationMs).toISOString() : null,
   }
 }
 
 export class ClaudeCodeProvider {
   private readonly claudeJsonPath: string
-  private readonly cachePath: string
+  private readonly historyPath: string
+  private readonly statuslineCachePath: string
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
-    this.claudeJsonPath = options.claudeJsonPath ?? path.join(os.homedir(), '.claude.json')
-    this.cachePath = options.cachePath ?? path.join(os.homedir(), '.claude', 'token-pulse-cache.json')
+    const home = os.homedir()
+    this.claudeJsonPath = options.claudeJsonPath ?? path.join(home, '.claude.json')
+    this.historyPath = options.historyPath ?? defaultHistoryPath(home)
+    this.statuslineCachePath = options.statuslineCachePath ?? path.join(home, '.claude', 'token-pulse-cache.json')
   }
 
   getPlanTier(): string | null {
@@ -63,28 +98,62 @@ export class ClaudeCodeProvider {
     }
   }
 
-  getCachedUsage(): CachedUsage | null {
-    let cache: StatuslineCache
+  private getCurrentOrgUuid(): string | null {
     try {
-      const parsed = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8'))
-      if (typeof parsed !== 'object' || parsed === null) {
-        return null
-      }
-      cache = parsed as StatuslineCache
+      const raw = fs.readFileSync(this.claudeJsonPath, 'utf-8')
+      const parsed = JSON.parse(raw) as { oauthAccount?: { organizationUuid?: string } }
+      return parsed.oauthAccount?.organizationUuid ?? null
     } catch {
       return null
     }
+  }
+
+  private getModelFromStatuslineCache(): string | null {
+    try {
+      const raw = fs.readFileSync(this.statuslineCachePath, 'utf-8')
+      const parsed = JSON.parse(raw) as StatuslineCache
+      return typeof parsed.model_display_name === 'string' ? parsed.model_display_name : null
+    } catch {
+      return null
+    }
+  }
+
+  getCachedUsage(): CachedUsage | null {
+    let file: UsageHistoryFile
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.historyPath, 'utf-8'))
+      if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.samples)) {
+        return null
+      }
+      file = parsed as UsageHistoryFile
+    } catch {
+      return null
+    }
+
+    const orgUuid = this.getCurrentOrgUuid()
+    const samples = orgUuid ? file.samples.filter((s) => !s.org || s.org === orgUuid) : file.samples
+    if (samples.length === 0) {
+      return null
+    }
+    const latest = samples[samples.length - 1]
+    if (typeof latest.t !== 'number' || typeof latest.u !== 'object' || latest.u === null) {
+      return null
+    }
+
     const windows: UsageWindow[] = []
-    if (isValidRateLimit(cache.five_hour)) {
-      windows.push(toUsageWindow('five_hour', 'Every 5 hours', cache.five_hour))
+    const fiveHour = buildWindow('five_hour', 'Every 5 hours', 'fh', FIVE_HOURS_MS, samples, latest)
+    if (fiveHour) {
+      windows.push(fiveHour)
     }
-    if (isValidRateLimit(cache.seven_day)) {
-      windows.push(toUsageWindow('weekly', 'Weekly', cache.seven_day))
+    const weekly = buildWindow('weekly', 'Weekly', 'sd', SEVEN_DAYS_MS, samples, latest)
+    if (weekly) {
+      windows.push(weekly)
     }
+
     return {
       windows,
-      currentModel: cache.model_display_name ?? null,
-      cacheUpdatedAt: typeof cache.updated_at === 'string' ? cache.updated_at : null,
+      currentModel: this.getModelFromStatuslineCache(),
+      cacheUpdatedAt: new Date(latest.t).toISOString(),
     }
   }
 }
