@@ -66,7 +66,11 @@ export class ClaudeCodeProvider {
   getCachedUsage(): CachedUsage | null {
     let cache: StatuslineCache
     try {
-      cache = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8')) as StatuslineCache
+      const parsed = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8'))
+      if (typeof parsed !== 'object' || parsed === null) {
+        return null
+      }
+      cache = parsed as StatuslineCache
     } catch {
       return null
     }

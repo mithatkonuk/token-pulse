@@ -92,4 +92,11 @@ describe('ClaudeCodeProvider', () => {
     expect(usage!.windows[0].id).toBe('weekly')
     expect(usage!.cacheUpdatedAt).toBeNull()
   })
+
+  it('returns null when the cache file contains the JSON literal null', () => {
+    fs.writeFileSync(cachePath, 'null')
+    const provider = new ClaudeCodeProvider({ claudeJsonPath, cachePath })
+    expect(() => provider.getCachedUsage()).not.toThrow()
+    expect(provider.getCachedUsage()).toBeNull()
+  })
 })
