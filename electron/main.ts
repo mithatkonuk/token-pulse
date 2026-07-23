@@ -12,7 +12,7 @@ const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 const PRELOAD_PATH = path.join(__dirname, 'preload.mjs')
 
 app.whenReady().then(() => {
-  const tray = createTray((trayRef) => {
+  createTray((trayRef) => {
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
   })
   updateTrayIcon(35)
