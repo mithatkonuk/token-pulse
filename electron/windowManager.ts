@@ -43,7 +43,8 @@ export function togglePopup(tray: Tray, preloadPath: string, source: PopupSource
   const x = Math.round(trayBounds.x + trayBounds.width / 2 - windowBounds.width / 2)
   const y = process.platform === 'darwin' ? trayBounds.y + trayBounds.height : trayBounds.y - windowBounds.height
   const clampedX = Math.min(Math.max(x, display.workArea.x), display.workArea.x + display.workArea.width - windowBounds.width)
-  win.setPosition(clampedX, y)
+  const clampedY = Math.min(Math.max(y, display.workArea.y), display.workArea.y + display.workArea.height - windowBounds.height)
+  win.setPosition(clampedX, clampedY)
   win.show()
   win.focus()
 }
