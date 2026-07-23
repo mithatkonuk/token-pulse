@@ -13,7 +13,10 @@
   ],
   "mac": {
     "target": ["dmg"],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "artifactName": "${productName}-Mac-${version}-Installer.${ext}",
+    "extendInfo": {
+      "LSUIElement": true
+    }
   },
   "win": {
     "target": [{ "target": "nsis", "arch": ["x64"] }],

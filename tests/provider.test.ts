@@ -78,7 +78,8 @@ describe('ClaudeCodeProvider', () => {
     const usage = provider().getCachedUsage()
     const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
     expect(fiveHour!.percentUsed).toBe(15)
-    expect(fiveHour!.resetsAt).toBe(new Date(2000 + 5 * 60 * 60 * 1000).toISOString())
+    // Reset detected between t=1000 (still 90) and t=2000 (dropped to 5) — anchor at the midpoint, 1500.
+    expect(fiveHour!.resetsAt).toBe(new Date(1500 + 5 * 60 * 60 * 1000).toISOString())
   })
 
   it('filters samples to the current org when org info is present', () => {
@@ -156,6 +157,7 @@ describe('ClaudeCodeProvider', () => {
     )
     const usage = provider().getCachedUsage()
     const fiveHour = usage!.windows.find((w) => w.id === 'five_hour')
-    expect(fiveHour!.resetsAt).toBe(new Date(4000 + 5 * 60 * 60 * 1000).toISOString())
+    // Second reset detected between t=3000 (50) and t=4000 (dropped to 5) — midpoint 3500.
+    expect(fiveHour!.resetsAt).toBe(new Date(3500 + 5 * 60 * 60 * 1000).toISOString())
   })
 })

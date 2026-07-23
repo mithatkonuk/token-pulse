@@ -59,7 +59,9 @@ function findLastResetTime(samples: HistorySample[], key: 'fh' | 'sd'): number |
     const prev = samples[i - 1].u[key]
     const cur = samples[i].u[key]
     if (typeof prev === 'number' && typeof cur === 'number' && cur < prev) {
-      lastResetT = samples[i].t
+      // The reset happened sometime between the two samples, not exactly at samples[i].t —
+      // the midpoint halves the expected error versus anchoring on the post-drop sample.
+      lastResetT = (samples[i - 1].t + samples[i].t) / 2
     }
   }
   return lastResetT
