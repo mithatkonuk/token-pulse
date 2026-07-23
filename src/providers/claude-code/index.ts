@@ -5,6 +5,10 @@ import type { UsageWindow } from '../../shared/types'
 
 const FIVE_HOURS_MS = 5 * 60 * 60 * 1000
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+// Desktop samples every ~5 minutes while running. A much bigger gap means the app was
+// asleep/closed, so the pre-drop sample is stale — anchor on the post-drop sample instead
+// of the midpoint, since the reset most likely happened shortly before sampling resumed.
+const STALE_GAP_MS = 15 * 60 * 1000
 
 interface HistorySample {
   t: number
@@ -59,9 +63,11 @@ function findLastResetTime(samples: HistorySample[], key: 'fh' | 'sd'): number |
     const prev = samples[i - 1].u[key]
     const cur = samples[i].u[key]
     if (typeof prev === 'number' && typeof cur === 'number' && cur < prev) {
-      // The reset happened sometime between the two samples, not exactly at samples[i].t —
-      // the midpoint halves the expected error versus anchoring on the post-drop sample.
-      lastResetT = (samples[i - 1].t + samples[i].t) / 2
+      const gap = samples[i].t - samples[i - 1].t
+      // Small gap: reset happened sometime between the two samples — the midpoint halves the
+      // expected error versus anchoring on the post-drop sample. Large gap: the pre-drop
+      // sample is stale (app was asleep/closed), so trust the post-drop sample instead.
+      lastResetT = gap > STALE_GAP_MS ? samples[i].t : (samples[i - 1].t + samples[i].t) / 2
     }
   }
   return lastResetT
