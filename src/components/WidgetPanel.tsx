@@ -3,6 +3,7 @@ import type { UsageState, AppSettings } from '../shared/types'
 import { UsageView } from './UsageView'
 import { SettingsView } from './SettingsView'
 import { AboutView } from './AboutView'
+import { BackIcon, SettingsIcon, InfoIcon } from './icons'
 
 type PanelView = 'usage' | 'settings' | 'about'
 
@@ -66,15 +67,15 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
         <div className="widget-panel__header-nav">
           {view !== 'usage' ? (
             <button className="widget-panel__icon-button" onClick={() => setView('usage')} aria-label="Back">
-              ←
+              <BackIcon />
             </button>
           ) : (
             <>
               <button className="widget-panel__icon-button" onClick={() => setView('settings')} aria-label="Settings">
-                ⚙
+                <SettingsIcon />
               </button>
               <button className="widget-panel__icon-button" onClick={() => setView('about')} aria-label="About">
-                ⓘ
+                <InfoIcon />
               </button>
             </>
           )}
