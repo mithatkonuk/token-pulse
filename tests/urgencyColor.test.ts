@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { urgencyColorForPercent } from '../src/shared/urgencyColor'
 
 describe('urgencyColorForPercent', () => {
-  it('returns green below 70%', () => {
-    expect(urgencyColorForPercent(0)).toBe('green')
-    expect(urgencyColorForPercent(69.9)).toBe('green')
+  it('returns blue below 80%', () => {
+    expect(urgencyColorForPercent(0)).toBe('blue')
+    expect(urgencyColorForPercent(79.9)).toBe('blue')
   })
 
-  it('returns yellow from 70% up to 90%', () => {
-    expect(urgencyColorForPercent(70)).toBe('yellow')
+  it('returns yellow from 80% up to 90%', () => {
+    expect(urgencyColorForPercent(80)).toBe('yellow')
     expect(urgencyColorForPercent(89.9)).toBe('yellow')
   })
 
