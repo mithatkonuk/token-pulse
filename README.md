@@ -1,32 +1,79 @@
+<div align="center">
+
 # token-pulse
 
-A tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude Code usage — the 5-hour and 7-day (weekly) rate limits, your plan tier, and the model you're currently using — without opening Claude Desktop.
+**Your Claude usage, always one glance away.**
+
+A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude 5-hour and weekly rate-limit usage — without ever opening Claude Desktop.
+
+![platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-informational)
+![node](https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white)
+![electron](https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white)
+![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+
+</div>
+
+---
+
+## Contents
+
+- [Features](#features)
+- [How it gets its numbers](#how-it-gets-its-numbers)
+- [Settings](#settings)
+- [Requirements](#requirements)
+- [Running a dev instance](#running-a-dev-instance)
+- [Building an installer](#building-an-installer)
+- [Project layout](#project-layout)
+- [Known limitations](#known-limitations)
+
+## Features
+
+- **Two usage rings** — 5-hour and weekly rate-limit percentage, with a countdown to reset
+- **Live urgency color** on the tray icon — blue under 80%, dark yellow from 80%, dark red from 90%
+- **OS-aware tray icon** — the normal-state ring color follows your system's light/dark menu-bar appearance automatically
+- **Runs in the background** — no Dock icon, no entry in the app switcher; lives entirely in the tray
+- **Settings** — dark/light in-app theme, accent color, font family & size, and a working "Start at login" toggle
+- **About panel** — version info and a contact link, one click away
+- 100% local — no network calls, no credentials, no telemetry
 
 ## How it gets its numbers
 
-Claude Code's own **statusline hook** (`~/.claude/statusline-command.sh`) receives real, authoritative rate-limit percentages from Anthropic on every render — the same numbers Claude Desktop's usage panel shows you. token-pulse doesn't call any API itself; it piggybacks on that hook.
+token-pulse reads **Claude Desktop's own local history file** — the same data Desktop's usage panel is built from:
 
-Setup added one small, additive block near the top of `~/.claude/statusline-command.sh` that writes a JSON snapshot to `~/.claude/token-pulse-cache.json` every time the statusline fires:
+| Platform | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Claude/plan-usage-history.json` |
+| Windows | `%APPDATA%\Claude\plan-usage-history.json` |
+| Linux | `~/.config/Claude/plan-usage-history.json` |
 
-```json
-{
-  "five_hour": { "used_percentage": 15.0, "resets_at": 1784850000 },
-  "seven_day": { "used_percentage": 52.0, "resets_at": 1784950000 },
-  "model_display_name": "Sonnet 5",
-  "updated_at": "2026-07-23T20:10:08Z"
-}
-```
+Claude Desktop appends a sample to this file roughly every 5 minutes while it's running. Each sample carries a timestamp and the current 5-hour/weekly usage percentages; token-pulse filters samples to your active org (via `oauthAccount.organizationUuid` in `~/.claude.json`) and derives:
 
-token-pulse polls this file every 5 seconds (`src/providers/claude-code/index.ts`) and reads your plan tier straight from `~/.claude.json` (`oauthAccount.organizationType`). Everything is local — no network calls, no credentials.
+- **Current usage** — the most recent sample's percentages
+- **Reset time** — approximated by detecting the last percentage *drop* between two samples (a reset event) and anchoring on the midpoint between them. If the gap between those two samples is unusually large (>15 minutes — Desktop was asleep or closed), it anchors on the later sample instead, since the real reset most likely happened just before sampling resumed.
 
-**This means the numbers only refresh while a Claude Code session is actively running** (whenever its statusline re-renders). Between sessions, the popup shows a "data as of Xm/Xh/Xd ago" line so you always know how fresh it is — a few hours old is normal if you haven't used Claude Code recently, and it catches up the moment you start a new session.
+The current **model name** still comes from Claude Code's statusline hook cache (`~/.claude/token-pulse-cache.json`), and **plan tier** from `~/.claude.json`'s `oauthAccount.organizationType`. Everything is read locally, on a 5-second poll (`POLL_MS` in `electron/main.ts`) — no API calls, ever.
 
-An earlier version approximated usage by counting tokens in `~/.claude/usage.db` against guessed thresholds. That approach was replaced entirely because the local DB isn't guaranteed to stay indexed (it silently went stale on the dev machine for weeks) — the statusline hook gives real numbers instead of a guess.
+**Freshness depends on Desktop, not on token-pulse.** Since Desktop only writes a new sample every ~5 minutes, the popup's "Data as of Xm ago" line reflects how recently *Desktop* last sampled — not how often token-pulse reads the file (which is much more frequent, every 5s). A few minutes of staleness between Desktop's own writes is normal.
+
+## Settings
+
+Click the ⚙ icon in the popup header to open Settings:
+
+| Control | Options |
+|---|---|
+| Theme | Dark / Light |
+| Accent color | Any color (native color picker) |
+| Font family | System / Monospace / Serif |
+| Font size | Small / Medium / Large |
+| Start at login | On / Off |
+
+Settings persist to disk and survive restarts. Click ⓘ for the About panel; click ← from either view to return to the usage screen.
 
 ## Requirements
 
 - Node.js 22+ and npm, for the dev/build tooling (Vite, Electron, TypeScript)
-- `jq` installed (used by the statusline script's caching block — almost certainly already on your machine if you have a statusline configured)
+- Claude Desktop installed and run at least once (so `plan-usage-history.json` exists)
+- `jq` installed, if you also want the model-name statusline block active (almost certainly already on your machine if you have a statusline configured)
 
 ## Running a dev instance
 
@@ -35,16 +82,16 @@ npm install
 npm run dev
 ```
 
-This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. You'll see a tray/menu-bar icon appear (a colored ring, green/yellow/red by usage) — click it to open the popup. Right-click the tray icon for a "Quit" option; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op).
-
-To see real numbers immediately, run a Claude Code session in another terminal — its statusline render will populate `~/.claude/token-pulse-cache.json`, and token-pulse will pick it up on its next 5-second poll.
+This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. A tray/menu-bar icon appears (a colored ring) — click it to open the popup. Right-click the tray icon for a "Quit" option; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op, and the app has no Dock icon on macOS).
 
 ### Tests and type-checking
 
 ```bash
-npm test              # vitest — pure logic (format helpers, tray icon pixels, provider, settings, autostart) is unit-tested; Electron glue (tray.ts, windowManager.ts, main.ts) is not, since those APIs aren't meaningfully unit-testable
+npm test                            # vitest — pure logic (format helpers, tray icon pixels, provider, settings, autostart) is unit-tested
 npx tsc -p tsconfig.json --noEmit   # strict type-check
 ```
+
+Electron-runtime glue (`electron/*.ts`) has no unit tests, since `Tray`/`BrowserWindow`/`app` APIs aren't meaningfully mockable — that layer is verified manually via `npm run dev` and the packaged app.
 
 ## Building an installer
 
@@ -52,12 +99,12 @@ npx tsc -p tsconfig.json --noEmit   # strict type-check
 npm run build
 ```
 
-This runs `tsc --noEmit && vite build && electron-builder`, producing installers under `release/<version>/` for whichever platform you build on:
+This runs `tsc --noEmit && vite build && electron-builder`, producing installers under `release/<version>/`:
 
 | Platform | Output | Notes |
 |---|---|---|
 | macOS | `token-pulse-Mac-<version>-Installer.dmg` + an unpacked `<arch>/token-pulse.app` | Unsigned by default (no Apple Developer ID configured) — macOS Gatekeeper will warn on first launch; right-click → Open, or codesign it yourself if you have a certificate. |
-| Windows | `token-pulse-Windows-<version>-Setup.exe` (NSIS installer) | Must be built on Windows, or on macOS/Linux with `wine` installed (electron-builder's standard cross-build requirement). Not build-verified on this machine. |
+| Windows | `token-pulse-Windows-<version>-Setup.exe` (NSIS installer) | Must be built on Windows, or on macOS/Linux with `wine` installed. Not build-verified on this machine. |
 | Linux | `token-pulse-Linux-<version>.AppImage` and a `.deb` | Must be built on Linux (or with electron-builder's Docker-based cross-build image). Not build-verified on this machine. |
 
 electron-builder only cross-builds some targets from macOS without extra tooling — building the Windows/Linux installers for real is easiest done on (or in a container for) that target OS. The config for all three lives in `electron-builder.json5` and doesn't need changes to add a platform's build — just run `npm run build` on that OS.
@@ -71,18 +118,19 @@ open release/<version>/mac-arm64/token-pulse.app   # or mac-x64 / mac, depending
 ## Project layout
 
 ```
-electron/                  Main-process entry, tray, popup window, autostart wiring (not unit-tested — Electron runtime APIs)
+electron/                  Main-process entry, tray icon wiring, popup window, autostart (not unit-tested — Electron runtime APIs)
 src/
-  providers/claude-code/    Reads the statusline cache + ~/.claude.json (ClaudeCodeProvider)
+  providers/claude-code/    Reads plan-usage-history.json + statusline cache + ~/.claude.json (ClaudeCodeProvider)
   main/                     Pure logic used by the main process (tray icon PNG rendering, settings persistence, Linux autostart entry)
   shared/                   Types and formatting helpers shared between main and renderer
-  components/               Popup UI (React)
+  components/               Popup UI (React) — WidgetPanel (nav shell), UsageView, SettingsView, AboutView
 tests/                      Vitest unit tests for everything above except electron/*
-docs/superpowers/           Design spec and implementation plan this project was built from
+docs/superpowers/           Design specs and implementation plans this project was built from
 ```
 
 ## Known limitations
 
-- Rate-limit data is only as fresh as your last active Claude Code session on this machine — there's no way to pull live numbers on demand outside of that.
+- Rate-limit data is only as fresh as Claude Desktop's last local write — there's no way to pull live numbers on demand outside of that.
+- The current model name still depends on the Claude Code statusline hook cache; usage percentages do not.
 - Windows and Linux packaging is configured but not build-or-run verified (this project was built and tested on macOS only).
-- No automated tests exist for the Electron main-process glue (`electron/*.ts`) — those were verified manually (`npm run dev`, checking the packaged app launches) rather than via unit tests, since Tray/BrowserWindow aren't meaningfully mockable.
+- No automated tests exist for the Electron main-process glue (`electron/*.ts`) or for React component rendering — both are verified manually rather than via unit tests.
