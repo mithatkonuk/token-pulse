@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { ContextWindow, UsageWindow } from '../../shared/types'
+import { findNewestTranscript, formatModelDisplayName, readLastModelId } from './transcript'
 
 const FIVE_HOURS_MS = 5 * 60 * 60 * 1000
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
@@ -41,6 +42,7 @@ export interface ClaudeCodeProviderOptions {
   claudeJsonPath?: string
   historyPath?: string
   statuslineCachePath?: string
+  projectsDir?: string
 }
 
 function defaultHistoryPath(home: string): string {
@@ -104,16 +106,18 @@ export class ClaudeCodeProvider {
   private readonly claudeJsonPath: string
   private readonly historyPath: string
   private readonly statuslineCachePath: string
+  private readonly projectsDir: string
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     const home = os.homedir()
     this.claudeJsonPath = options.claudeJsonPath ?? path.join(home, '.claude.json')
     this.historyPath = options.historyPath ?? defaultHistoryPath(home)
     this.statuslineCachePath = options.statuslineCachePath ?? path.join(home, '.claude', 'token-pulse-cache.json')
+    this.projectsDir = options.projectsDir ?? path.join(home, '.claude', 'projects')
   }
 
   getWatchedPaths(): string[] {
-    return [this.historyPath, this.statuslineCachePath, this.claudeJsonPath]
+    return [this.historyPath, this.statuslineCachePath, this.claudeJsonPath, this.projectsDir]
   }
 
   getPlanTier(): string | null {
@@ -134,6 +138,18 @@ export class ClaudeCodeProvider {
     } catch {
       return null
     }
+  }
+
+  // Session transcripts are written by both the CLI and the desktop app, so they track the
+  // model the user actually picked. The statusline cache only updates while the CLI renders
+  // its statusline, which never happens in the desktop app — hence the fallback ordering.
+  private getModelFromTranscript(): string | null {
+    const transcript = findNewestTranscript(this.projectsDir)
+    if (transcript === null) {
+      return null
+    }
+    const modelId = readLastModelId(transcript)
+    return modelId !== null ? formatModelDisplayName(modelId) : null
   }
 
   private getModelFromStatuslineCache(): string | null {
@@ -200,7 +216,7 @@ export class ClaudeCodeProvider {
 
     return {
       windows,
-      currentModel: this.getModelFromStatuslineCache(),
+      currentModel: this.getModelFromTranscript() ?? this.getModelFromStatuslineCache(),
       contextWindow: this.getContextWindowFromStatuslineCache(),
       cacheUpdatedAt: new Date(latest.t).toISOString(),
     }

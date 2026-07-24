@@ -8,12 +8,15 @@ let dir: string
 let historyPath: string
 let claudeJsonPath: string
 let statuslineCachePath: string
+let projectsDir: string
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-provider-test-'))
   historyPath = path.join(dir, 'plan-usage-history.json')
   claudeJsonPath = path.join(dir, 'claude.json')
   statuslineCachePath = path.join(dir, 'token-pulse-cache.json')
+  projectsDir = path.join(dir, 'projects')
+  fs.mkdirSync(projectsDir)
   fs.writeFileSync(
     claudeJsonPath,
     JSON.stringify({ oauthAccount: { organizationType: 'claude_max_5x', organizationUuid: 'org-a' } })
@@ -25,7 +28,7 @@ afterEach(() => {
 })
 
 function provider() {
-  return new ClaudeCodeProvider({ claudeJsonPath, historyPath, statuslineCachePath })
+  return new ClaudeCodeProvider({ claudeJsonPath, historyPath, statuslineCachePath, projectsDir })
 }
 
 describe('ClaudeCodeProvider', () => {
@@ -39,7 +42,7 @@ describe('ClaudeCodeProvider', () => {
   })
 
   it('exposes the paths it reads from, for file-watch wiring', () => {
-    expect(provider().getWatchedPaths()).toEqual([historyPath, statuslineCachePath, claudeJsonPath])
+    expect(provider().getWatchedPaths()).toEqual([historyPath, statuslineCachePath, claudeJsonPath, projectsDir])
   })
 
   it('returns null cached usage when the history file does not exist', () => {
@@ -113,6 +116,23 @@ describe('ClaudeCodeProvider', () => {
     fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
     const usage = provider().getCachedUsage()
     expect(usage!.currentModel).toBeNull()
+  })
+
+  it('prefers the model from the newest session transcript over the statusline cache', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    fs.writeFileSync(statuslineCachePath, JSON.stringify({ model_display_name: 'Sonnet 5' }))
+    const projectDir = path.join(projectsDir, 'my-project')
+    fs.mkdirSync(projectDir)
+    fs.writeFileSync(path.join(projectDir, 'session.jsonl'), JSON.stringify({ message: { model: 'claude-opus-5' } }))
+    const usage = provider().getCachedUsage()
+    expect(usage!.currentModel).toBe('Opus 5')
+  })
+
+  it('falls back to the statusline cache when no transcript is found', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    fs.writeFileSync(statuslineCachePath, JSON.stringify({ model_display_name: 'Sonnet 5' }))
+    const usage = provider().getCachedUsage()
+    expect(usage!.currentModel).toBe('Sonnet 5')
   })
 
   it('reads the context window from the statusline cache', () => {
