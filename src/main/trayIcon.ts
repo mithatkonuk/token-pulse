@@ -4,9 +4,9 @@ import { urgencyColorForPercent, type UrgencyColor } from '../shared/urgencyColo
 export const ICON_SIZE = 16
 
 const FILLED_RGBA: Record<UrgencyColor, [number, number, number, number]> = {
-  green: [52, 199, 89, 255],
-  yellow: [255, 204, 0, 255],
-  red: [255, 59, 48, 255],
+  blue: [0, 0, 139, 255], // dark blue
+  yellow: [184, 134, 11, 255], // dark yellow (goldenrod)
+  red: [139, 0, 0, 255], // dark red
 }
 
 const TRACK_RGBA: [number, number, number, number] = [128, 128, 128, 90]

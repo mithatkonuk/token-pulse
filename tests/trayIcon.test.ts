@@ -22,9 +22,9 @@ describe('renderUsageRingPng', () => {
 
   it('fills clockwise from the top of the ring up to the percentage, leaving the rest as track color', () => {
     const png = PNG.sync.read(renderUsageRingPng(50, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([52, 199, 89, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 139, 255])
     expect(pixelAt(png, 9, 1)).toEqual([128, 128, 128, 90])
-    expect(pixelAt(png, 10, 18)).toEqual([52, 199, 89, 255])
+    expect(pixelAt(png, 10, 18)).toEqual([0, 0, 139, 255])
   })
 
   it('leaves the ring entirely track-colored at 0%', () => {
@@ -34,11 +34,11 @@ describe('renderUsageRingPng', () => {
 
   it('fills the entire ring at 100%', () => {
     const png = PNG.sync.read(renderUsageRingPng(100, 20))
-    expect(pixelAt(png, 10, 18)).toEqual([255, 59, 48, 255])
+    expect(pixelAt(png, 10, 18)).toEqual([139, 0, 0, 255])
   })
 
   it('uses red fill color at 90% or above', () => {
     const png = PNG.sync.read(renderUsageRingPng(95, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([255, 59, 48, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([139, 0, 0, 255])
   })
 })

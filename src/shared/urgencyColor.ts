@@ -1,11 +1,11 @@
-export type UrgencyColor = 'green' | 'yellow' | 'red'
+export type UrgencyColor = 'blue' | 'yellow' | 'red'
 
 export function urgencyColorForPercent(percentUsed: number): UrgencyColor {
   if (percentUsed >= 90) {
     return 'red'
   }
-  if (percentUsed >= 70) {
+  if (percentUsed >= 80) {
     return 'yellow'
   }
-  return 'green'
+  return 'blue'
 }
