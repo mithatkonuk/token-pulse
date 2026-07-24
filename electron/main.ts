@@ -2,7 +2,7 @@ import { app, ipcMain } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTray, updateTrayIcon } from './tray'
-import { togglePopup, getPopupIfExists } from './windowManager'
+import { togglePopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import type { UsageState, AppSettings } from '../src/shared/types'
@@ -24,6 +24,7 @@ let state: UsageState = {
   planTier: provider.getPlanTier(),
   currentModel: null,
   windows: [],
+  contextWindow: null,
   updatedAt: new Date().toISOString(),
   cacheUpdatedAt: null,
   settings: readSettings(SETTINGS_PATH),
@@ -46,6 +47,7 @@ function poll(): void {
     planTier: provider.getPlanTier(),
     currentModel: cached?.currentModel ?? null,
     windows: cached?.windows ?? [],
+    contextWindow: cached?.contextWindow ?? null,
     updatedAt: new Date().toISOString(),
     cacheUpdatedAt: cached?.cacheUpdatedAt ?? null,
   }
@@ -62,6 +64,10 @@ ipcMain.handle('settings:update', (_event, patch: Partial<AppSettings>) => {
   writeSettings(SETTINGS_PATH, next)
   state = { ...state, settings: next }
   pushState()
+})
+
+ipcMain.on('popup:resize', (_event, height: number) => {
+  getPopupIfExists()?.setContentSize(POPUP_WIDTH, Math.max(1, Math.round(height)))
 })
 
 app.whenReady().then(() => {

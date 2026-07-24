@@ -30,12 +30,11 @@ export function SettingsView({
           <button className={settings.theme === 'light' ? 'is-active' : ''} onClick={() => onUpdate({ theme: 'light' })}>
             Light
           </button>
+          <button className={settings.theme === 'system' ? 'is-active' : ''} onClick={() => onUpdate({ theme: 'system' })}>
+            System
+          </button>
         </div>
       </div>
-      <label className="settings-view__row">
-        <span>Accent color</span>
-        <input type="color" value={settings.accentColor} onChange={(e) => onUpdate({ accentColor: e.target.value })} />
-      </label>
       <label className="settings-view__row">
         <span>Font family</span>
         <select

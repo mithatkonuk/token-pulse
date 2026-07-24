@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { UsageState, AppSettings } from '../shared/types'
 import { UsageView } from './UsageView'
 import { SettingsView } from './SettingsView'
@@ -28,9 +28,22 @@ function accentStyle(settings: AppSettings): CSSProperties {
 
 export function WidgetPanel({ state }: { state: UsageState | null }) {
   const [view, setView] = useState<PanelView>('usage')
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) {
+      return
+    }
+    const observer = new ResizeObserver(() => {
+      window.ipcRenderer.send('popup:resize', el.offsetHeight)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   if (!state) {
-    return <div className="widget-panel">Loading usage…</div>
+    return <div ref={panelRef} className="widget-panel">Loading usage…</div>
   }
 
   function updateSettings(patch: Partial<AppSettings>): void {
@@ -39,8 +52,10 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
       .catch((err: unknown) => console.error('Failed to update settings', err))
   }
 
+  const dataTheme = state.settings.theme === 'system' ? undefined : state.settings.theme
+
   return (
-    <div className="widget-panel" data-theme={state.settings.theme} style={accentStyle(state.settings)}>
+    <div ref={panelRef} className="widget-panel" data-theme={dataTheme} style={accentStyle(state.settings)}>
       <div className="widget-panel__header">
         <div className="widget-panel__header-info">
           <span>{state.currentModel ?? 'No recent activity'}</span>
