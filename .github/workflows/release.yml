@@ -33,7 +33,7 @@ jobs:
           name: installers-${{ matrix.os }}
           path: |
             release/**/*.dmg
-            release/**/*.exe
+            release/**/*-Setup.exe
             release/**/*.AppImage
             release/**/*.deb
           if-no-files-found: error
@@ -53,7 +53,7 @@ jobs:
       - name: Flatten artifacts into one directory
         run: |
           mkdir -p dist-release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist-release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*-Setup.exe' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist-release/ \;
           ls -la dist-release
 
       - name: Extract the annotated tag message as release notes
