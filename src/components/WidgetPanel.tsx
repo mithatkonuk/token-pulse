@@ -1,39 +1,71 @@
-import type { UsageState } from '../shared/types'
-import { formatRelativeTime } from '../shared/format'
-import { UsageBar } from './UsageBar'
+import { useState, type CSSProperties } from 'react'
+import type { UsageState, AppSettings } from '../shared/types'
+import { UsageView } from './UsageView'
+import { SettingsView } from './SettingsView'
+import { AboutView } from './AboutView'
+
+type PanelView = 'usage' | 'settings' | 'about'
+
+const FONT_FAMILY_STACKS: Record<AppSettings['fontFamily'], string> = {
+  system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  monospace: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  serif: "Georgia, 'Times New Roman', serif",
+}
+
+const FONT_SIZES_PX: Record<AppSettings['fontSize'], string> = {
+  small: '12px',
+  medium: '13px',
+  large: '15px',
+}
+
+function accentStyle(settings: AppSettings): CSSProperties {
+  return {
+    '--accent-color': settings.accentColor,
+    '--font-family': FONT_FAMILY_STACKS[settings.fontFamily],
+    '--font-size': FONT_SIZES_PX[settings.fontSize],
+  } as CSSProperties
+}
 
 export function WidgetPanel({ state }: { state: UsageState | null }) {
+  const [view, setView] = useState<PanelView>('usage')
+
   if (!state) {
     return <div className="widget-panel">Loading usage…</div>
   }
-  const fiveHour = state.windows.find((w) => w.id === 'five_hour')
-  const weekly = state.windows.find((w) => w.id === 'weekly')
+
+  function updateSettings(patch: Partial<AppSettings>): void {
+    window.ipcRenderer
+      .invoke('settings:update', patch)
+      .catch((err: unknown) => console.error('Failed to update settings', err))
+  }
+
   return (
-    <div className="widget-panel">
+    <div className="widget-panel" data-theme={state.settings.theme} style={accentStyle(state.settings)}>
       <div className="widget-panel__header">
-        <span>{state.currentModel ?? 'No recent activity'}</span>
-        <span className="widget-panel__tier">{state.planTier ?? 'plan unknown'}</span>
+        <div className="widget-panel__header-info">
+          <span>{state.currentModel ?? 'No recent activity'}</span>
+          <span className="widget-panel__tier">{state.planTier ?? 'plan unknown'}</span>
+        </div>
+        <div className="widget-panel__header-nav">
+          {view !== 'usage' ? (
+            <button className="widget-panel__icon-button" onClick={() => setView('usage')} aria-label="Back">
+              ←
+            </button>
+          ) : (
+            <>
+              <button className="widget-panel__icon-button" onClick={() => setView('settings')} aria-label="Settings">
+                ⚙
+              </button>
+              <button className="widget-panel__icon-button" onClick={() => setView('about')} aria-label="About">
+                ⓘ
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      {fiveHour && <UsageBar window={fiveHour} />}
-      {weekly && <UsageBar window={weekly} />}
-      {state.windows.length === 0 && (
-        <div className="widget-panel__empty">No usage data yet — open a Claude Code session to populate this.</div>
-      )}
-      <label className="widget-panel__autostart">
-        <input
-          type="checkbox"
-          checked={state.startAtLogin}
-          onChange={(e) =>
-            window.ipcRenderer
-              .invoke('settings:setStartAtLogin', e.target.checked)
-              .catch((err: unknown) => console.error('Failed to update start-at-login setting', err))
-          }
-        />
-        Start at login
-      </label>
-      {state.cacheUpdatedAt && (
-        <div className="widget-panel__freshness">Data as of {formatRelativeTime(state.cacheUpdatedAt)}</div>
-      )}
+      {view === 'usage' && <UsageView state={state} />}
+      {view === 'settings' && <SettingsView settings={state.settings} onUpdate={updateSettings} />}
+      {view === 'about' && <AboutView appVersion={state.appVersion} />}
     </div>
   )
 }
