@@ -1,6 +1,7 @@
 import { app, ipcMain, nativeTheme } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import chokidar from 'chokidar'
 import { createTray, updateTrayIcon } from './tray'
 import { togglePopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
@@ -16,7 +17,9 @@ const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 const PRELOAD_PATH = path.join(__dirname, 'preload.mjs')
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 
-const POLL_MS = 5 * 1000
+// Safety net in case the file watcher misses an event (rare, but fs watching
+// isn't 100% reliable cross-platform) — normal updates are watch-driven, not timed.
+const FALLBACK_POLL_MS = 60 * 1000
 
 const provider = new ClaudeCodeProvider()
 
@@ -89,7 +92,15 @@ app.whenReady().then(() => {
     pushState()
   }, resolveIsDarkMode(state.settings.theme))
   poll()
-  setInterval(poll, POLL_MS)
+  chokidar
+    .watch(provider.getWatchedPaths(), {
+      ignoreInitial: true,
+      atomic: true,
+      awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+    })
+    .on('add', poll)
+    .on('change', poll)
+  setInterval(poll, FALLBACK_POLL_MS)
 })
 
 app.on('window-all-closed', () => {
