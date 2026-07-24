@@ -41,4 +41,14 @@ describe('renderUsageRingPng', () => {
     const png = PNG.sync.read(renderUsageRingPng(95, 20))
     expect(pixelAt(png, 10, 1)).toEqual([139, 0, 0, 255])
   })
+
+  it('renders white as the normal-state fill when isSystemDarkMode is true', () => {
+    const png = PNG.sync.read(renderUsageRingPng(50, 20, true))
+    expect(pixelAt(png, 10, 1)).toEqual([255, 255, 255, 255])
+  })
+
+  it('keeps the red fill at 90%+ regardless of isSystemDarkMode', () => {
+    const png = PNG.sync.read(renderUsageRingPng(95, 20, true))
+    expect(pixelAt(png, 10, 1)).toEqual([139, 0, 0, 255])
+  })
 })
