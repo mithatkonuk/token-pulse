@@ -5,7 +5,7 @@ import { createTray, updateTrayIcon } from './tray'
 import { togglePopup, getPopupIfExists } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
-import type { UsageState } from '../src/shared/types'
+import type { UsageState, AppSettings } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -26,7 +26,8 @@ let state: UsageState = {
   windows: [],
   updatedAt: new Date().toISOString(),
   cacheUpdatedAt: null,
-  startAtLogin: readSettings(SETTINGS_PATH).startAtLogin,
+  settings: readSettings(SETTINGS_PATH),
+  appVersion: app.getVersion(),
 }
 
 function pushState(): void {
@@ -53,10 +54,13 @@ function poll(): void {
 
 ipcMain.handle('usage:get', () => state)
 
-ipcMain.handle('settings:setStartAtLogin', (_event, enabled: boolean) => {
-  const actual = setStartAtLogin(enabled)
-  writeSettings(SETTINGS_PATH, { startAtLogin: actual })
-  state = { ...state, startAtLogin: actual }
+ipcMain.handle('settings:update', (_event, patch: Partial<AppSettings>) => {
+  const next: AppSettings = { ...state.settings, ...patch }
+  if (patch.startAtLogin !== undefined) {
+    next.startAtLogin = setStartAtLogin(patch.startAtLogin)
+  }
+  writeSettings(SETTINGS_PATH, next)
+  state = { ...state, settings: next }
   pushState()
 })
 
@@ -64,9 +68,9 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     app.dock?.hide()
   }
-  const actualStartAtLogin = getStartAtLogin()
-  writeSettings(SETTINGS_PATH, { startAtLogin: actualStartAtLogin })
-  state = { ...state, startAtLogin: actualStartAtLogin }
+  const actualSettings: AppSettings = { ...state.settings, startAtLogin: getStartAtLogin() }
+  writeSettings(SETTINGS_PATH, actualSettings)
+  state = { ...state, settings: actualSettings }
   createTray((trayRef) => {
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
     pushState()
