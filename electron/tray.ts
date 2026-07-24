@@ -1,5 +1,5 @@
-import { Tray, nativeImage, Menu, app } from 'electron'
-import { renderUsageRingPng } from '../src/main/trayIcon'
+import { Tray, nativeImage, Menu, app, nativeTheme } from 'electron'
+import { renderUsageRingPng, ICON_SIZE } from '../src/main/trayIcon'
 
 let tray: Tray | null = null
 
@@ -8,7 +8,7 @@ function formatTitle(percentUsed: number): string {
 }
 
 export function createTray(onClick: (tray: Tray) => void): Tray {
-  tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0)))
+  tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0, ICON_SIZE, nativeTheme.shouldUseDarkColors)))
   tray.setToolTip('token-pulse')
   if (process.platform === 'darwin') {
     tray.setTitle(formatTitle(0))
@@ -23,7 +23,7 @@ export function updateTrayIcon(percentUsed: number): void {
   if (!tray) {
     return
   }
-  tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed)))
+  tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed, ICON_SIZE, nativeTheme.shouldUseDarkColors)))
   if (process.platform === 'darwin') {
     tray.setTitle(formatTitle(percentUsed))
   }

@@ -3,18 +3,28 @@ import { urgencyColorForPercent, type UrgencyColor } from '../shared/urgencyColo
 
 export const ICON_SIZE = 16
 
-const FILLED_RGBA: Record<UrgencyColor, [number, number, number, number]> = {
-  blue: [0, 0, 139, 255], // dark blue
-  yellow: [184, 134, 11, 255], // dark yellow (goldenrod)
-  red: [139, 0, 0, 255], // dark red
-}
+const DARK_BLUE: [number, number, number, number] = [0, 0, 139, 255]
+const WHITE: [number, number, number, number] = [255, 255, 255, 255]
+const DARK_YELLOW: [number, number, number, number] = [184, 134, 11, 255]
+const DARK_RED: [number, number, number, number] = [139, 0, 0, 255]
 
 const TRACK_RGBA: [number, number, number, number] = [128, 128, 128, 90]
 
-export function renderUsageRingPng(percentUsed: number, size: number = ICON_SIZE): Buffer {
+function filledRgbaFor(color: UrgencyColor, isSystemDarkMode: boolean): [number, number, number, number] {
+  switch (color) {
+    case 'blue':
+      return isSystemDarkMode ? WHITE : DARK_BLUE
+    case 'yellow':
+      return DARK_YELLOW
+    case 'red':
+      return DARK_RED
+  }
+}
+
+export function renderUsageRingPng(percentUsed: number, size: number = ICON_SIZE, isSystemDarkMode = false): Buffer {
   const clamped = Math.max(0, Math.min(100, percentUsed))
   const filledAngle = (clamped / 100) * 360
-  const filledColor = FILLED_RGBA[urgencyColorForPercent(percentUsed)]
+  const filledColor = filledRgbaFor(urgencyColorForPercent(percentUsed), isSystemDarkMode)
   const png = new PNG({ width: size, height: size })
   const center = (size - 1) / 2
   const outerRadius = size / 2
