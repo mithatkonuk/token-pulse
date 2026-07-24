@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTray, updateTrayIcon } from './tray'
 import { togglePopup, getPopupIfExists } from './windowManager'
-import { setStartAtLogin } from './autostart'
+import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import type { UsageState } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
@@ -54,9 +54,9 @@ function poll(): void {
 ipcMain.handle('usage:get', () => state)
 
 ipcMain.handle('settings:setStartAtLogin', (_event, enabled: boolean) => {
-  writeSettings(SETTINGS_PATH, { startAtLogin: enabled })
-  setStartAtLogin(enabled)
-  state = { ...state, startAtLogin: enabled }
+  const actual = setStartAtLogin(enabled)
+  writeSettings(SETTINGS_PATH, { startAtLogin: actual })
+  state = { ...state, startAtLogin: actual }
   pushState()
 })
 
@@ -64,6 +64,9 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     app.dock?.hide()
   }
+  const actualStartAtLogin = getStartAtLogin()
+  writeSettings(SETTINGS_PATH, { startAtLogin: actualStartAtLogin })
+  state = { ...state, startAtLogin: actualStartAtLogin }
   createTray((trayRef) => {
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
     pushState()
