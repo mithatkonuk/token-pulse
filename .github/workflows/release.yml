@@ -26,7 +26,13 @@ jobs:
 
       - run: npm test
 
-      - run: npm run build
+      - name: Build (mac universal, both arches)
+        if: matrix.os == 'macos-latest'
+        run: npm run build -- --x64 --arm64
+
+      - name: Build
+        if: matrix.os != 'macos-latest'
+        run: npm run build
 
       - uses: actions/upload-artifact@v4
         with:
