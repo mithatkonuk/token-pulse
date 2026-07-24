@@ -62,17 +62,21 @@
 }
 
 .widget-panel__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
+  border-radius: 6px;
   color: inherit;
-  font-size: 1em;
   cursor: pointer;
-  opacity: 0.7;
-  padding: 2px 4px;
+  opacity: 0.6;
+  padding: 5px;
 }
 
 .widget-panel__icon-button:hover {
   opacity: 1;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .widget-panel__tier {
