@@ -10,9 +10,29 @@ const TAIL_BYTES = 256 * 1024
 // Transcripts also carry "<synthetic>" placeholders and bare aliases like "sonnet".
 const VERSIONED_MODEL_ID = /^claude-[a-z]+-\d[\d-]*$/
 
+// `/model` takes effect immediately, but the transcript line it produces is user-authored
+// (the CLI echoing its own command output) — it carries the new model as plain text, not
+// as message.model, and only the next assistant reply would otherwise reflect the switch.
+const MODEL_COMMAND_STDOUT = /<local-command-stdout>Set model to (\S+)<\/local-command-stdout>/
+
 interface TranscriptEntry {
   isSidechain?: unknown
-  message?: { model?: unknown }
+  message?: { model?: unknown; content?: unknown }
+}
+
+function extractModelId(entry: TranscriptEntry): string | null {
+  const model = entry.message?.model
+  if (typeof model === 'string' && VERSIONED_MODEL_ID.test(model)) {
+    return model
+  }
+  const content = entry.message?.content
+  if (typeof content === 'string') {
+    const match = content.match(MODEL_COMMAND_STDOUT)
+    if (match && VERSIONED_MODEL_ID.test(match[1])) {
+      return match[1]
+    }
+  }
+  return null
 }
 
 export function findNewestTranscript(projectsDir: string): string | null {
@@ -75,9 +95,10 @@ function readTail(file: string): string | null {
 }
 
 /**
- * Walks back from the end of a transcript for the model of the newest main-thread assistant
- * entry. Sidechain (subagent) entries are skipped — they can run a different model than the
- * one the user picked for the session.
+ * Walks back from the end of a transcript for the most recently known model: either the newest
+ * main-thread assistant entry's model, or a still-unanswered `/model` switch's command-stdout
+ * line, whichever is more recent. Sidechain (subagent) entries are skipped — they can run a
+ * different model than the one the user picked for the session.
  */
 export function readLastModelId(file: string): string | null {
   const tail = readTail(file)
@@ -99,8 +120,8 @@ export function readLastModelId(file: string): string | null {
     if (entry.isSidechain === true) {
       continue
     }
-    const model = entry.message?.model
-    if (typeof model === 'string' && VERSIONED_MODEL_ID.test(model)) {
+    const model = extractModelId(entry)
+    if (model !== null) {
       return model
     }
   }

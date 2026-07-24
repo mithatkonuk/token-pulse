@@ -88,8 +88,15 @@ app.whenReady().then(() => {
   writeSettings(SETTINGS_PATH, actualSettings)
   state = { ...state, settings: actualSettings }
   createTray((trayRef) => {
+    const wasVisible = getPopupIfExists()?.isVisible() ?? false
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
-    pushState()
+    // Opening: re-read from disk so the panel never shows a watch event we haven't caught yet.
+    // Closing: nothing to render, so just keep the tray icon in sync without a redundant read.
+    if (wasVisible) {
+      pushState()
+    } else {
+      poll()
+    }
   }, resolveIsDarkMode(state.settings.theme))
   poll()
   chokidar
