@@ -73,7 +73,7 @@ Click the ⚙ icon in the popup header to open Settings:
 | Control | Options |
 |---|---|
 | Theme | Dark / Light / System (follows the OS appearance) |
-| Font family | System / Monospace / Serif |
+| Font family | System / Monospace / Serif / Menlo / JetBrains Mono |
 | Font size | Small / Medium / Large |
 | Start at login | On / Off |
 

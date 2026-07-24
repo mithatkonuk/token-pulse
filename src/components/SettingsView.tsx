@@ -4,6 +4,8 @@ const FONT_FAMILIES: Array<{ value: AppSettings['fontFamily']; label: string }> 
   { value: 'system', label: 'System' },
   { value: 'monospace', label: 'Monospace' },
   { value: 'serif', label: 'Serif' },
+  { value: 'menlo', label: 'Menlo' },
+  { value: 'jetbrains-mono', label: 'JetBrains Mono' },
 ]
 
 const FONT_SIZES: Array<{ value: AppSettings['fontSize']; label: string }> = [
