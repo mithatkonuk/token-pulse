@@ -12,8 +12,8 @@
     "dist-electron"
   ],
   "mac": {
-    "target": ["dmg"],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}",
+    "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+    "artifactName": "${productName}-Mac-${arch}-${version}-Installer.${ext}",
     "extendInfo": {
       "LSUIElement": true
     }
