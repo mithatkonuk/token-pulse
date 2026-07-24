@@ -20,22 +20,22 @@ describe('renderUsageRingPng', () => {
     expect(pixelAt(png, 0, 0)).toEqual([0, 0, 0, 0])
   })
 
-  it('in light mode, fills clockwise with white up to the percentage, leaving the rest black', () => {
+  it('in light mode, fills clockwise with solid black up to the percentage, leaving the rest as a faint black track', () => {
     const png = PNG.sync.read(renderUsageRingPng(50, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([255, 255, 255, 255])
-    expect(pixelAt(png, 9, 1)).toEqual([0, 0, 0, 255])
-    expect(pixelAt(png, 10, 18)).toEqual([255, 255, 255, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 255])
+    expect(pixelAt(png, 9, 1)).toEqual([0, 0, 0, 90])
+    expect(pixelAt(png, 10, 18)).toEqual([0, 0, 0, 255])
   })
 
-  it('in dark mode, fills clockwise with black up to the percentage, leaving the rest white', () => {
+  it('in dark mode, fills clockwise with solid white up to the percentage, leaving the rest as a faint white track', () => {
     const png = PNG.sync.read(renderUsageRingPng(50, 20, true))
-    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 255])
-    expect(pixelAt(png, 9, 1)).toEqual([255, 255, 255, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([255, 255, 255, 255])
+    expect(pixelAt(png, 9, 1)).toEqual([255, 255, 255, 90])
   })
 
   it('leaves the ring entirely track-colored at 0%', () => {
     const png = PNG.sync.read(renderUsageRingPng(0, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 90])
   })
 
   it('fills the entire ring at 100%', () => {

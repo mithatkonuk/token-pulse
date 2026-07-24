@@ -4,18 +4,20 @@ import { urgencyColorForPercent, type UrgencyColor } from '../shared/urgencyColo
 export const ICON_SIZE = 16
 
 const WHITE: [number, number, number, number] = [255, 255, 255, 255]
+const WHITE_TRACK: [number, number, number, number] = [255, 255, 255, 90]
 const BLACK: [number, number, number, number] = [0, 0, 0, 255]
+const BLACK_TRACK: [number, number, number, number] = [0, 0, 0, 90]
 const DARK_YELLOW: [number, number, number, number] = [184, 134, 11, 255]
 const DARK_RED: [number, number, number, number] = [139, 0, 0, 255]
 
 function trackRgbaFor(isDarkMode: boolean): [number, number, number, number] {
-  return isDarkMode ? WHITE : BLACK
+  return isDarkMode ? WHITE_TRACK : BLACK_TRACK
 }
 
 function filledRgbaFor(color: UrgencyColor, isDarkMode: boolean): [number, number, number, number] {
   switch (color) {
     case 'blue':
-      return isDarkMode ? BLACK : WHITE
+      return isDarkMode ? WHITE : BLACK
     case 'yellow':
       return DARK_YELLOW
     case 'red':
