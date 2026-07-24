@@ -5,9 +5,15 @@ export interface UsageWindow {
   resetsAt: string | null
 }
 
+export interface ContextWindow {
+  usedPercentage: number
+  totalInputTokens: number
+  contextWindowSize: number
+}
+
 export interface AppSettings {
   startAtLogin: boolean
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'system'
   accentColor: string
   fontFamily: 'system' | 'monospace' | 'serif'
   fontSize: 'small' | 'medium' | 'large'
@@ -17,6 +23,7 @@ export interface UsageState {
   planTier: string | null
   currentModel: string | null
   windows: UsageWindow[]
+  contextWindow: ContextWindow | null
   updatedAt: string
   cacheUpdatedAt: string | null
   settings: AppSettings

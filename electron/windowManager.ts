@@ -3,6 +3,8 @@ import path from 'node:path'
 
 let popup: BrowserWindow | null = null
 
+export const POPUP_WIDTH = 320
+
 export interface PopupSource {
   devServerUrl?: string
   rendererDist?: string
@@ -13,7 +15,7 @@ export function getOrCreatePopup(preloadPath: string, source: PopupSource): Brow
     return popup
   }
   popup = new BrowserWindow({
-    width: 320,
+    width: POPUP_WIDTH,
     height: 220,
     backgroundColor: '#1c1c1e',
     show: false,

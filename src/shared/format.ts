@@ -16,6 +16,24 @@ export function formatCountdown(resetsAtIso: string, now: Date = new Date()): st
   return `resets in ${minutes}m`
 }
 
+export function formatCompactNumber(n: number): string {
+  if (n >= 1_000_000) {
+    return `${(n / 1_000_000).toFixed(1)}M`
+  }
+  if (n >= 1000) {
+    return `${(n / 1000).toFixed(1)}k`
+  }
+  return `${Math.round(n)}`
+}
+
+export function formatPlanTier(planTier: string | null): string {
+  if (!planTier) {
+    return 'plan unknown'
+  }
+  const stripped = planTier.replace(/^claude_/, '')
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1)
+}
+
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {
   const diffMs = now.getTime() - new Date(iso).getTime()
   if (diffMs < 60000) {

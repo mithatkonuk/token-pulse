@@ -111,6 +111,29 @@ describe('ClaudeCodeProvider', () => {
     expect(usage!.currentModel).toBeNull()
   })
 
+  it('reads the context window from the statusline cache', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    fs.writeFileSync(
+      statuslineCachePath,
+      JSON.stringify({ context_window: { used_percentage: 27, total_input_tokens: 263600, context_window_size: 967000 } })
+    )
+    const usage = provider().getCachedUsage()
+    expect(usage!.contextWindow).toEqual({ usedPercentage: 27, totalInputTokens: 263600, contextWindowSize: 967000 })
+  })
+
+  it('returns null context window when the statusline cache is missing', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    const usage = provider().getCachedUsage()
+    expect(usage!.contextWindow).toBeNull()
+  })
+
+  it('returns null context window when the cached fields are malformed', () => {
+    fs.writeFileSync(historyPath, JSON.stringify({ version: 2, samples: [{ t: 1000, org: 'org-a', u: { fh: 1, sd: 1 } }] }))
+    fs.writeFileSync(statuslineCachePath, JSON.stringify({ context_window: { used_percentage: 'a lot' } }))
+    const usage = provider().getCachedUsage()
+    expect(usage!.contextWindow).toBeNull()
+  })
+
   it('returns null when the history file contains the JSON literal null (crash-safety)', () => {
     fs.writeFileSync(historyPath, 'null')
     expect(() => provider().getCachedUsage()).not.toThrow()
