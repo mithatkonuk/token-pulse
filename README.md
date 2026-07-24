@@ -11,6 +11,11 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 ![electron](https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white)
 ![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
+<p>
+  <img src="docs/screenshots/usage-dark.png" width="320" alt="token-pulse popup — dark theme">
+  <img src="docs/screenshots/usage-light.png" width="320" alt="token-pulse popup — light theme">
+</p>
+
 </div>
 
 ---
@@ -29,10 +34,11 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 ## Features
 
 - **Two usage rings** — 5-hour and weekly rate-limit percentage, with a countdown to reset
+- **Context window usage** — current conversation's token usage against the model's context window, when available
 - **Live urgency color** on the tray icon — blue under 80%, dark yellow from 80%, dark red from 90%
 - **OS-aware tray icon** — the normal-state ring color follows your system's light/dark menu-bar appearance automatically
 - **Runs in the background** — no Dock icon, no entry in the app switcher; lives entirely in the tray
-- **Settings** — dark/light in-app theme, accent color, font family & size, and a working "Start at login" toggle
+- **Settings** — dark/light/system in-app theme, font family & size, and a working "Start at login" toggle
 - **About panel** — version info and a contact link, one click away
 - 100% local — no network calls, no credentials, no telemetry
 
@@ -51,7 +57,7 @@ Claude Desktop appends a sample to this file roughly every 5 minutes while it's 
 - **Current usage** — the most recent sample's percentages
 - **Reset time** — approximated by detecting the last percentage *drop* between two samples (a reset event) and anchoring on the midpoint between them. If the gap between those two samples is unusually large (>15 minutes — Desktop was asleep or closed), it anchors on the later sample instead, since the real reset most likely happened just before sampling resumed.
 
-The current **model name** still comes from Claude Code's statusline hook cache (`~/.claude/token-pulse-cache.json`), and **plan tier** from `~/.claude.json`'s `oauthAccount.organizationType`. Everything is read locally, on a 5-second poll (`POLL_MS` in `electron/main.ts`) — no API calls, ever.
+The current **model name** and **context window usage** still come from Claude Code's statusline hook cache (`~/.claude/token-pulse-cache.json`, populated by `~/.claude/statusline-command.sh` on every statusline render), and **plan tier** from `~/.claude.json`'s `oauthAccount.organizationType`. Everything is read locally, on a 5-second poll (`POLL_MS` in `electron/main.ts`) — no API calls, ever.
 
 **Freshness depends on Desktop, not on token-pulse.** Since Desktop only writes a new sample every ~5 minutes, the popup's "Data as of Xm ago" line reflects how recently *Desktop* last sampled — not how often token-pulse reads the file (which is much more frequent, every 5s). A few minutes of staleness between Desktop's own writes is normal.
 
@@ -59,10 +65,14 @@ The current **model name** still comes from Claude Code's statusline hook cache 
 
 Click the ⚙ icon in the popup header to open Settings:
 
+<p>
+  <img src="docs/screenshots/settings-dark.png" width="320" alt="Settings view — dark theme">
+  <img src="docs/screenshots/settings-light.png" width="320" alt="Settings view — light theme">
+</p>
+
 | Control | Options |
 |---|---|
-| Theme | Dark / Light |
-| Accent color | Any color (native color picker) |
+| Theme | Dark / Light / System (follows the OS appearance) |
 | Font family | System / Monospace / Serif |
 | Font size | Small / Medium / Large |
 | Start at login | On / Off |
