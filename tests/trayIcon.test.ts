@@ -20,16 +20,22 @@ describe('renderUsageRingPng', () => {
     expect(pixelAt(png, 0, 0)).toEqual([0, 0, 0, 0])
   })
 
-  it('fills clockwise from the top of the ring up to the percentage, leaving the rest as track color', () => {
+  it('in light mode, fills clockwise with white up to the percentage, leaving the rest black', () => {
     const png = PNG.sync.read(renderUsageRingPng(50, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 139, 255])
-    expect(pixelAt(png, 9, 1)).toEqual([128, 128, 128, 90])
-    expect(pixelAt(png, 10, 18)).toEqual([0, 0, 139, 255])
+    expect(pixelAt(png, 10, 1)).toEqual([255, 255, 255, 255])
+    expect(pixelAt(png, 9, 1)).toEqual([0, 0, 0, 255])
+    expect(pixelAt(png, 10, 18)).toEqual([255, 255, 255, 255])
+  })
+
+  it('in dark mode, fills clockwise with black up to the percentage, leaving the rest white', () => {
+    const png = PNG.sync.read(renderUsageRingPng(50, 20, true))
+    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 255])
+    expect(pixelAt(png, 9, 1)).toEqual([255, 255, 255, 255])
   })
 
   it('leaves the ring entirely track-colored at 0%', () => {
     const png = PNG.sync.read(renderUsageRingPng(0, 20))
-    expect(pixelAt(png, 10, 1)).toEqual([128, 128, 128, 90])
+    expect(pixelAt(png, 10, 1)).toEqual([0, 0, 0, 255])
   })
 
   it('fills the entire ring at 100%', () => {
@@ -42,12 +48,7 @@ describe('renderUsageRingPng', () => {
     expect(pixelAt(png, 10, 1)).toEqual([139, 0, 0, 255])
   })
 
-  it('renders white as the normal-state fill when isSystemDarkMode is true', () => {
-    const png = PNG.sync.read(renderUsageRingPng(50, 20, true))
-    expect(pixelAt(png, 10, 1)).toEqual([255, 255, 255, 255])
-  })
-
-  it('keeps the red fill at 90%+ regardless of isSystemDarkMode', () => {
+  it('keeps the red fill at 90%+ regardless of dark mode', () => {
     const png = PNG.sync.read(renderUsageRingPng(95, 20, true))
     expect(pixelAt(png, 10, 1)).toEqual([139, 0, 0, 255])
   })

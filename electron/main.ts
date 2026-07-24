@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, nativeTheme } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTray, updateTrayIcon } from './tray'
@@ -31,9 +31,16 @@ let state: UsageState = {
   appVersion: app.getVersion(),
 }
 
+function resolveIsDarkMode(theme: AppSettings['theme']): boolean {
+  if (theme === 'system') {
+    return nativeTheme.shouldUseDarkColors
+  }
+  return theme === 'dark'
+}
+
 function pushState(): void {
   const fiveHour = state.windows.find((w) => w.id === 'five_hour')
-  updateTrayIcon(fiveHour?.percentUsed ?? 0)
+  updateTrayIcon(fiveHour?.percentUsed ?? 0, resolveIsDarkMode(state.settings.theme))
   const popup = getPopupIfExists()
   if (popup && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
@@ -80,7 +87,7 @@ app.whenReady().then(() => {
   createTray((trayRef) => {
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
     pushState()
-  })
+  }, resolveIsDarkMode(state.settings.theme))
   poll()
   setInterval(poll, POLL_MS)
 })

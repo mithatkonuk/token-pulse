@@ -3,6 +3,7 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "dev.mithatkonuk.tokenpulse",
   "asar": true,
+  "publish": null,
   "productName": "token-pulse",
   "directories": {
     "output": "release/${version}"
