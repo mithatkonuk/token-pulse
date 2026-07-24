@@ -83,6 +83,26 @@ describe('readLastModelId', () => {
     expect(readLastModelId(file)).toBeNull()
   })
 
+  it('picks up a /model switch from its command-stdout line before any assistant reply', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      { message: { model: 'claude-sonnet-5' } },
+      { type: 'user', message: { role: 'user', content: '<command-name>/model</command-name>' } },
+      {
+        type: 'user',
+        message: { role: 'user', content: '<local-command-stdout>Set model to claude-opus-5</local-command-stdout>' },
+      },
+    ])
+    expect(readLastModelId(file)).toBe('claude-opus-5')
+  })
+
+  it('ignores non-string message content when checking for a /model command-stdout line', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      { message: { model: 'claude-opus-5' } },
+      { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'hi' }] } },
+    ])
+    expect(readLastModelId(file)).toBe('claude-opus-5')
+  })
+
   it('skips a malformed trailing line instead of crashing', () => {
     const filePath = path.join(dir, 'proj-a')
     fs.mkdirSync(filePath, { recursive: true })
