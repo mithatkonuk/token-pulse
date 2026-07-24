@@ -42,6 +42,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -52,8 +56,13 @@ jobs:
           find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist-release/ \;
           ls -la dist-release
 
+      - name: Extract the annotated tag message as release notes
+        run: git tag -l --format='%(contents)' "${{ github.ref_name }}" > tag-body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist-release/*
+          body_path: tag-body.md
           generate_release_notes: true
+          append_body: true
