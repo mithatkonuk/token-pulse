@@ -1,5 +1,6 @@
 import type { UsageWindow } from '../shared/types'
 import { formatCountdown } from '../shared/format'
+import { urgencyColorForPercent } from '../shared/urgencyColor'
 
 export function UsageBar({ window }: { window: UsageWindow }) {
   const percent = Math.min(100, Math.max(0, window.percentUsed))
@@ -15,7 +16,10 @@ export function UsageBar({ window }: { window: UsageWindow }) {
         </span>
       </div>
       <div className="usage-bar__track">
-        <div className="usage-bar__fill" style={{ width: `${percent}%` }} />
+        <div
+          className={`usage-bar__fill usage-bar__fill--${urgencyColorForPercent(window.percentUsed)}`}
+          style={{ width: `${percent}%` }}
+        />
       </div>
     </div>
   )

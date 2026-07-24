@@ -120,6 +120,14 @@
   height: 100%;
 }
 
+.usage-bar__fill--yellow {
+  background: #ffd60a;
+}
+
+.usage-bar__fill--red {
+  background: #ff453a;
+}
+
 .widget-panel__empty {
   font-size: 0.85em;
   opacity: 0.7;
