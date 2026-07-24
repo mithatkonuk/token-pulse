@@ -1,10 +1,13 @@
 import fs from 'node:fs'
+import type { AppSettings } from '../shared/types'
 
-export interface AppSettings {
-  startAtLogin: boolean
+const DEFAULT_SETTINGS: AppSettings = {
+  startAtLogin: false,
+  theme: 'dark',
+  accentColor: '#0a84ff',
+  fontFamily: 'system',
+  fontSize: 'medium',
 }
-
-const DEFAULT_SETTINGS: AppSettings = { startAtLogin: false }
 
 export function readSettings(filePath: string): AppSettings {
   try {
