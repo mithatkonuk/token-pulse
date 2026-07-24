@@ -38,6 +38,10 @@ describe('ClaudeCodeProvider', () => {
     expect(p.getPlanTier()).toBeNull()
   })
 
+  it('exposes the paths it reads from, for file-watch wiring', () => {
+    expect(provider().getWatchedPaths()).toEqual([historyPath, statuslineCachePath, claudeJsonPath])
+  })
+
   it('returns null cached usage when the history file does not exist', () => {
     expect(provider().getCachedUsage()).toBeNull()
   })

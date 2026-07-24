@@ -112,6 +112,10 @@ export class ClaudeCodeProvider {
     this.statuslineCachePath = options.statuslineCachePath ?? path.join(home, '.claude', 'token-pulse-cache.json')
   }
 
+  getWatchedPaths(): string[] {
+    return [this.historyPath, this.statuslineCachePath, this.claudeJsonPath]
+  }
+
   getPlanTier(): string | null {
     try {
       const raw = fs.readFileSync(this.claudeJsonPath, 'utf-8')
