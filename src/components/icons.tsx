@@ -36,3 +36,30 @@ export function InfoIcon() {
     </svg>
   )
 }
+
+export function MailIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 6-10 7L2 6" />
+    </svg>
+  )
+}
+
+export function AppMark() {
+  return (
+    <svg viewBox="0 0 36 36" fill="none">
+      <circle cx="18" cy="18" r="15" stroke="currentColor" strokeWidth="4" opacity="0.18" />
+      <circle
+        cx="18"
+        cy="18"
+        r="15"
+        stroke="currentColor"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeDasharray="70 200"
+        transform="rotate(-90 18 18)"
+      />
+    </svg>
+  )
+}

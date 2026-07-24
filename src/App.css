@@ -192,24 +192,52 @@
   outline-offset: 1px;
 }
 
+.about-view {
+  text-align: center;
+  padding: 6px 0 2px;
+}
+
+.about-view__mark {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 10px;
+  color: var(--accent-color);
+}
+
+.about-view__mark svg {
+  width: 100%;
+  height: 100%;
+}
+
 .about-view__name {
   font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 1.05em;
+  margin-bottom: 2px;
 }
 
 .about-view__version {
   opacity: 0.6;
-  font-size: 0.85em;
-  margin-bottom: 12px;
+  font-size: 0.8em;
+  margin-bottom: 14px;
 }
 
 .about-view__description {
   font-size: 0.9em;
-  margin-bottom: 12px;
+  opacity: 0.85;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .about-view__contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--accent-color);
   text-decoration: none;
   font-size: 0.9em;
+  margin-top: 10px;
+}
+
+.about-view__contact:hover {
+  text-decoration: underline;
 }
