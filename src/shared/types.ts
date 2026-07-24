@@ -5,11 +5,20 @@ export interface UsageWindow {
   resetsAt: string | null
 }
 
+export interface AppSettings {
+  startAtLogin: boolean
+  theme: 'dark' | 'light'
+  accentColor: string
+  fontFamily: 'system' | 'monospace' | 'serif'
+  fontSize: 'small' | 'medium' | 'large'
+}
+
 export interface UsageState {
   planTier: string | null
   currentModel: string | null
   windows: UsageWindow[]
   updatedAt: string
   cacheUpdatedAt: string | null
-  startAtLogin: boolean
+  settings: AppSettings
+  appVersion: string
 }
