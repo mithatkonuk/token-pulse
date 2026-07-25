@@ -1,10 +1,21 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { ContributingStats, TopEntry } from '../../shared/types'
 
 const USAGE_COMMAND_TIMEOUT_MS = 20_000
+
+// GUI-launched apps (a double-clicked .app, not something run from a terminal) get macOS's
+// bare launchd PATH, which excludes Homebrew and other common install locations — so a plain
+// `claude` lookup that works fine under `npm run dev` fails silently once packaged. Prepending
+// these covers the common cases without needing to know the exact binary path per platform.
+function buildAugmentedPath(): string {
+  const home = os.homedir()
+  const extraDirs = ['/opt/homebrew/bin', '/usr/local/bin', path.join(home, '.local', 'bin')]
+  return [...extraDirs, process.env.PATH ?? ''].filter(Boolean).join(path.delimiter)
+}
 
 export interface UsageWindowResult {
   percentUsed: number
@@ -45,7 +56,12 @@ export function runUsageCommand(cwd: string, projectsDir: string): Promise<strin
     execFile(
       'claude',
       ['-p', '/usage', '--session-id', sessionId],
-      { cwd, timeout: USAGE_COMMAND_TIMEOUT_MS, maxBuffer: 1024 * 1024 },
+      {
+        cwd,
+        timeout: USAGE_COMMAND_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024,
+        env: { ...process.env, PATH: buildAugmentedPath() },
+      },
       (error, stdout) => {
         deleteSessionTranscript(projectsDir, sessionId)
         resolve(error ? null : stdout)
