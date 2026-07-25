@@ -7,10 +7,15 @@ function TopEntriesRow({ label, entries }: { label: string; entries: TopEntry[] 
   if (entries.length === 0) {
     return null
   }
-  const text = entries.map((entry) => `${entry.name} ${entry.percent}%`).join(', ')
   return (
-    <div className="contributing__row">
-      <span className="contributing__row-label">{label}:</span> {text}
+    <div className="contributing__category">
+      <div className="contributing__category-label">{label}</div>
+      {entries.map((entry) => (
+        <div key={entry.name} className="contributing__entry">
+          <span className="contributing__entry-name">{entry.name}</span>
+          <span className="contributing__entry-percent">{entry.percent}%</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -37,12 +42,14 @@ function ContributingStatsSection({ contributing }: { contributing: UsageState['
       </div>
       {stats ? (
         <div className="contributing__body">
-          <div className="contributing__meta">
-            {stats.requests} requests · {stats.sessions} sessions
+          <div className="contributing__category">
+            <div className="contributing__meta">
+              {stats.requests} requests · {stats.sessions} sessions
+            </div>
+            {stats.aboveContextPercent !== null && (
+              <div className="contributing__row">{stats.aboveContextPercent}% ran above 150k context</div>
+            )}
           </div>
-          {stats.aboveContextPercent !== null && (
-            <div className="contributing__row">{stats.aboveContextPercent}% ran above 150k context</div>
-          )}
           <TopEntriesRow label="Skills" entries={stats.topSkills} />
           <TopEntriesRow label="Subagents" entries={stats.topSubagents} />
           <TopEntriesRow label="Plugins" entries={stats.topPlugins} />
