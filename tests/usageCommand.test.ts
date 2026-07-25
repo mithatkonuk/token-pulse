@@ -123,6 +123,19 @@ describe('runUsageCommand', () => {
     )
   })
 
+  it('augments PATH with common install locations, since a packaged app is launched without the shell PATH', async () => {
+    const { execFile } = await import('node:child_process')
+    vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
+      cb(null, 'usage output')
+      return {} as ReturnType<typeof execFile>
+    }) as typeof execFile)
+
+    await runUsageCommand('/tmp', projectsDir)
+    const callOpts = vi.mocked(execFile).mock.calls[0][2] as { env: Record<string, string | undefined> }
+    expect(callOpts.env.PATH).toContain('/opt/homebrew/bin')
+    expect(callOpts.env.PATH).toContain('/usr/local/bin')
+  })
+
   it('resolves with null when the command fails', async () => {
     const { execFile } = await import('node:child_process')
     vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
