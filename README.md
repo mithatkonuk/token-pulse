@@ -33,33 +33,25 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 
 ## Features
 
-- **Two usage rings** — 5-hour and weekly rate-limit percentage, with a countdown to reset
+- **Two usage bars** — 5-hour and weekly rate-limit percentage, with the plain-language reset time Claude Code itself reports
+- **What's using your limits** — a 24h/7d breakdown of top skills, subagents, plugins, and MCP servers, straight from `/usage`
 - **Context window usage** — current conversation's token usage against the model's context window, when available
-- **Live urgency color** on the tray icon — blue under 80%, dark yellow from 80%, dark red from 90%
+- **Live urgency color** on the tray icon and usage bars — blue under 80%, yellow/dark yellow from 80%, red/dark red from 90%
 - **OS-aware tray icon** — the normal-state ring color follows your system's light/dark menu-bar appearance automatically
 - **Runs in the background** — no Dock icon, no entry in the app switcher; lives entirely in the tray
 - **Settings** — dark/light/system in-app theme, font family & size, and a working "Start at login" toggle
 - **About panel** — version info and a contact link, one click away
-- 100% local — no network calls, no credentials, no telemetry
+- No credentials handled or stored — everything runs through your existing `claude` CLI session
 
 ## How it gets its numbers
 
-token-pulse reads **Claude Desktop's own local history file** — the same data Desktop's usage panel is built from:
+**Usage bars and the limits breakdown** come from shelling out to `claude -p "/usage"` — the same slash command you'd run yourself in a terminal. It's a real subprocess call (~1-2s), and it's the only network-touching part of the app: `/usage` itself is a pure local command (no model/API-turn cost), but it does ask Claude's account-status endpoint for your real percentages. This call happens once at startup and then every 3 minutes — deliberately not tied to file-watching or popup-open, since each call has real latency and a real side effect (see below), not something worth paying on every UI interaction.
 
-| Platform | Path |
-|---|---|
-| macOS | `~/Library/Application Support/Claude/plan-usage-history.json` |
-| Windows | `%APPDATA%\Claude\plan-usage-history.json` |
-| Linux | `~/.config/Claude/plan-usage-history.json` |
+Every `-p` invocation starts a brand-new session, which writes a transcript file under `~/.claude/projects/<project-hash>/`. token-pulse pins the session ID itself (`--session-id`) and always runs from a dedicated scratch directory (`<userData>/usage-check-cwd`, never a real project), then deletes that exact transcript file right after reading the output — so this doesn't leave any of the usual per-session clutter behind, and it never gets attributed to whatever project you're actually working in.
 
-Claude Desktop appends a sample to this file roughly every 5 minutes while it's running. Each sample carries a timestamp and the current 5-hour/weekly usage percentages; token-pulse filters samples to your active org (via `oauthAccount.organizationUuid` in `~/.claude.json`) and derives:
+The current **model name** is read from the newest entry in `~/.claude/projects/**/*.jsonl` (session transcripts, written by both the CLI and Desktop), since the statusline hook cache never updates outside a CLI session; it falls back to that cache (`~/.claude/token-pulse-cache.json`, populated by `~/.claude/statusline-command.sh`) if no transcript is found. **Context window usage** still comes from the statusline cache. **Plan tier** comes from `~/.claude.json`'s `oauthAccount.organizationType`. These three are driven by a file watcher (with a 60s fallback poll in case a watch event is missed) — no process spawns, no extra latency.
 
-- **Current usage** — the most recent sample's percentages
-- **Reset time** — approximated by detecting the last percentage *drop* between two samples (a reset event) and anchoring on the midpoint between them. If the gap between those two samples is unusually large (>15 minutes — Desktop was asleep or closed), it anchors on the later sample instead, since the real reset most likely happened just before sampling resumed.
-
-The current **model name** is read from the newest entry in `~/.claude/projects/**/*.jsonl` (session transcripts, written by both the CLI and Desktop), since the statusline hook cache never updates outside a CLI session; it falls back to that cache (`~/.claude/token-pulse-cache.json`, populated by `~/.claude/statusline-command.sh`) if no transcript is found. **Context window usage** still comes from the statusline cache — Desktop has no equivalent. **Plan tier** comes from `~/.claude.json`'s `oauthAccount.organizationType`. Everything is read locally, driven by a file watcher on all of the above (with a 60s fallback poll in case a watch event is missed) — no API calls, ever.
-
-**Freshness depends on Desktop, not on token-pulse.** Since Desktop only writes a new sample every ~5 minutes, the popup's "Data as of Xm ago" line reflects how recently *Desktop* last sampled — not how often token-pulse reads the file (which is much more frequent, every 5s). A few minutes of staleness between Desktop's own writes is normal.
+**Freshness for the usage bars depends on the last successful `/usage` call, not on file activity.** The popup's "Data as of Xm ago" line reflects that 3-minute cadence — the account-level percentages don't change fast enough to need finer granularity than that.
 
 ## Settings
 
@@ -82,7 +74,7 @@ Settings persist to disk and survive restarts. Click ⓘ for the About panel; cl
 ## Requirements
 
 - Node.js 22+ and npm, for the dev/build tooling (Vite, Electron, TypeScript)
-- Claude Desktop installed and run at least once (so `plan-usage-history.json` exists)
+- The `claude` CLI installed and on `PATH`, logged in (usage bars run it directly)
 - `jq` installed, if you also want the model-name statusline block active (almost certainly already on your machine if you have a statusline configured)
 
 ## Running a dev instance
@@ -130,7 +122,7 @@ open release/<version>/mac-arm64/token-pulse.app   # or mac-x64 / mac, depending
 ```
 electron/                  Main-process entry, tray icon wiring, popup window, autostart (not unit-tested — Electron runtime APIs)
 src/
-  providers/claude-code/    Reads plan-usage-history.json + statusline cache + ~/.claude.json (ClaudeCodeProvider)
+  providers/claude-code/    Runs `claude -p "/usage"` for the bars + limits breakdown; reads statusline cache + ~/.claude.json for model/context/plan (ClaudeCodeProvider)
   main/                     Pure logic used by the main process (tray icon PNG rendering, settings persistence, Linux autostart entry)
   shared/                   Types and formatting helpers shared between main and renderer
   components/               Popup UI (React) — WidgetPanel (nav shell), UsageView, SettingsView, AboutView
@@ -140,7 +132,9 @@ docs/superpowers/           Design specs and implementation plans this project w
 
 ## Known limitations
 
-- Rate-limit data is only as fresh as Claude Desktop's last local write — there's no way to pull live numbers on demand outside of that.
-- The current model name still depends on the Claude Code statusline hook cache; usage percentages do not.
+- Usage bars are only as fresh as the last successful `/usage` call (every 3 minutes) — there's no push/webhook, so between calls the numbers can lag reality by up to that interval.
+- Each `/usage` call is a real subprocess spawn (~1-2s); this is deliberately not run on every popup open or file-watch event, to keep that cost bounded.
+- The current model name still depends on the Claude Code statusline hook cache or session transcripts; usage percentages do not.
+- The "This session" cost/lines-changed/per-model breakdown you see in Claude Code's own interactive `/cost` or `/stats` views isn't available here — that data lives only in a live interactive session's in-memory state and can't be retrieved by a separate background process, no matter how it's invoked.
 - Windows and Linux packaging is configured but not build-or-run verified (this project was built and tested on macOS only).
 - No automated tests exist for the Electron main-process glue (`electron/*.ts`) or for React component rendering — both are verified manually rather than via unit tests.

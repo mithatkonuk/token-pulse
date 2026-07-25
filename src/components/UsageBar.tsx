@@ -1,5 +1,4 @@
 import type { UsageWindow } from '../shared/types'
-import { formatCountdown } from '../shared/format'
 import { urgencyColorForPercent } from '../shared/urgencyColor'
 
 export function UsageBar({ window }: { window: UsageWindow }) {
@@ -9,9 +8,7 @@ export function UsageBar({ window }: { window: UsageWindow }) {
       <div className="usage-bar__header">
         <span>{window.label}</span>
         <span className="usage-bar__meta">
-          <span className="usage-bar__reset">
-            {window.resetsAt ? formatCountdown(window.resetsAt) : 'reset time unknown'}
-          </span>
+          <span className="usage-bar__reset">{window.resetsText ?? 'reset time unknown'}</span>
           <span>{Math.round(window.percentUsed)}%</span>
         </span>
       </div>

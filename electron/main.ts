@@ -1,4 +1,5 @@
 import { app, ipcMain, nativeTheme } from 'electron'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
@@ -21,6 +22,14 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 // isn't 100% reliable cross-platform) — normal updates are watch-driven, not timed.
 const FALLBACK_POLL_MS = 60 * 1000
 
+// `claude -p "/usage"` is a real process spawn (~1-2s) that hits Anthropic's account-status
+// endpoint, not a file read — polled far less often than the file-watched data above.
+const USAGE_COMMAND_POLL_MS = 3 * 60 * 1000
+// A dedicated scratch directory, never a real project's cwd, so these recurring background
+// calls don't get attributed to whatever project you're actually working in.
+const USAGE_COMMAND_CWD = path.join(app.getPath('userData'), 'usage-check-cwd')
+fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
+
 const provider = new ClaudeCodeProvider()
 
 let state: UsageState = {
@@ -28,6 +37,7 @@ let state: UsageState = {
   currentModel: null,
   windows: [],
   contextWindow: null,
+  contributing: null,
   updatedAt: new Date().toISOString(),
   cacheUpdatedAt: null,
   settings: readSettings(SETTINGS_PATH),
@@ -55,11 +65,23 @@ function poll(): void {
   state = {
     ...state,
     planTier: provider.getPlanTier(),
-    currentModel: cached?.currentModel ?? null,
-    windows: cached?.windows ?? [],
-    contextWindow: cached?.contextWindow ?? null,
+    currentModel: cached.currentModel,
+    contextWindow: cached.contextWindow,
     updatedAt: new Date().toISOString(),
-    cacheUpdatedAt: cached?.cacheUpdatedAt ?? null,
+  }
+  pushState()
+}
+
+async function refreshUsageFromCommand(): Promise<void> {
+  const result = await provider.getUsageFromCommand(USAGE_COMMAND_CWD)
+  if (result === null) {
+    return
+  }
+  state = {
+    ...state,
+    windows: result.windows,
+    contributing: result.contributing,
+    cacheUpdatedAt: result.fetchedAt,
   }
   pushState()
 }
@@ -99,6 +121,7 @@ app.whenReady().then(() => {
     }
   }, resolveIsDarkMode(state.settings.theme))
   poll()
+  void refreshUsageFromCommand()
   chokidar
     .watch(provider.getWatchedPaths(), {
       ignoreInitial: true,
@@ -108,6 +131,7 @@ app.whenReady().then(() => {
     .on('add', poll)
     .on('change', poll)
   setInterval(poll, FALLBACK_POLL_MS)
+  setInterval(refreshUsageFromCommand, USAGE_COMMAND_POLL_MS)
 })
 
 app.on('window-all-closed', () => {
