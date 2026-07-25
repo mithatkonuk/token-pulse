@@ -4,7 +4,7 @@
 
 **Your Claude usage, always one glance away.**
 
-A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude 5-hour and weekly rate-limit usage — without ever opening Claude Desktop.
+A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude 5-hour and weekly rate-limit usage — without ever running `/usage` yourself.
 
 ![platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-informational)
 ![node](https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white)
@@ -12,8 +12,8 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 ![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
 <p>
-  <img src="docs/screenshots/usage-dark.png" width="320" alt="token-pulse popup — dark theme">
-  <img src="docs/screenshots/usage-light.png" width="320" alt="token-pulse popup — light theme">
+  <img src="docs/screenshots/usage-limits-7d.png" width="320" alt="token-pulse popup — usage limits with 7-day breakdown">
+  <img src="docs/screenshots/usage-limits-24h.png" width="320" alt="token-pulse popup — usage limits with 24-hour breakdown">
 </p>
 
 </div>
