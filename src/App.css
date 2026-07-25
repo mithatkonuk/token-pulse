@@ -79,6 +79,17 @@
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
+.widget-panel__model-qualifier {
+  font-size: 0.65em;
+  font-weight: 400;
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+  vertical-align: 1px;
+  cursor: help;
+}
+
 .widget-panel__tier {
   opacity: 0.6;
   font-weight: 400;
