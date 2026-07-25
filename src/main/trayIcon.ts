@@ -7,7 +7,7 @@ const WHITE: [number, number, number, number] = [255, 255, 255, 255]
 const WHITE_TRACK: [number, number, number, number] = [255, 255, 255, 90]
 const BLACK: [number, number, number, number] = [0, 0, 0, 255]
 const BLACK_TRACK: [number, number, number, number] = [0, 0, 0, 90]
-const DARK_YELLOW: [number, number, number, number] = [184, 134, 11, 255]
+const DARK_ORANGE: [number, number, number, number] = [255, 140, 0, 255]
 const DARK_RED: [number, number, number, number] = [139, 0, 0, 255]
 
 function trackRgbaFor(isDarkMode: boolean): [number, number, number, number] {
@@ -18,8 +18,8 @@ function filledRgbaFor(color: UrgencyColor, isDarkMode: boolean): [number, numbe
   switch (color) {
     case 'blue':
       return isDarkMode ? WHITE : BLACK
-    case 'yellow':
-      return DARK_YELLOW
+    case 'orange':
+      return DARK_ORANGE
     case 'red':
       return DARK_RED
   }

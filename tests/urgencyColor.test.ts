@@ -7,9 +7,9 @@ describe('urgencyColorForPercent', () => {
     expect(urgencyColorForPercent(79.9)).toBe('blue')
   })
 
-  it('returns yellow from 80% up to 90%', () => {
-    expect(urgencyColorForPercent(80)).toBe('yellow')
-    expect(urgencyColorForPercent(89.9)).toBe('yellow')
+  it('returns orange from 80% up to 90%', () => {
+    expect(urgencyColorForPercent(80)).toBe('orange')
+    expect(urgencyColorForPercent(89.9)).toBe('orange')
   })
 
   it('returns red at 90% and above, including over 100%', () => {
