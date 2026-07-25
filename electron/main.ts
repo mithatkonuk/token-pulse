@@ -9,6 +9,7 @@ import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import type { UsageState, AppSettings } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
+import { shouldRefreshUsageCommand } from '../src/main/usageCommandScheduler'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -22,15 +23,17 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 // isn't 100% reliable cross-platform) — normal updates are watch-driven, not timed.
 const FALLBACK_POLL_MS = 60 * 1000
 
-// `claude -p "/usage"` is a real process spawn (~1-2s) that hits Anthropic's account-status
-// endpoint, not a file read — polled far less often than the file-watched data above.
-const USAGE_COMMAND_POLL_MS = 3 * 60 * 1000
 // A dedicated scratch directory, never a real project's cwd, so these recurring background
 // calls don't get attributed to whatever project you're actually working in.
 const USAGE_COMMAND_CWD = path.join(app.getPath('userData'), 'usage-check-cwd')
 fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
 
 const provider = new ClaudeCodeProvider()
+
+// Tracks real Claude activity (any watched session/cache file write) so the /usage command
+// cadence can back off when nothing's happening instead of polling on a fixed timer forever.
+let lastActivityAt = Date.now()
+let lastUsageCommandAt = 0
 
 let state: UsageState = {
   planTier: provider.getPlanTier(),
@@ -70,6 +73,18 @@ function poll(): void {
     updatedAt: new Date().toISOString(),
   }
   pushState()
+}
+
+function onWatchedFileActivity(): void {
+  lastActivityAt = Date.now()
+  poll()
+}
+
+function maybeRefreshUsageFromCommand(): void {
+  if (shouldRefreshUsageCommand({ now: Date.now(), lastActivityAt, lastRefreshAt: lastUsageCommandAt })) {
+    lastUsageCommandAt = Date.now()
+    void refreshUsageFromCommand()
+  }
 }
 
 async function refreshUsageFromCommand(): Promise<void> {
@@ -121,6 +136,7 @@ app.whenReady().then(() => {
     }
   }, resolveIsDarkMode(state.settings.theme))
   poll()
+  lastUsageCommandAt = Date.now()
   void refreshUsageFromCommand()
   chokidar
     .watch(provider.getWatchedPaths(), {
@@ -128,10 +144,10 @@ app.whenReady().then(() => {
       atomic: true,
       awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
     })
-    .on('add', poll)
-    .on('change', poll)
+    .on('add', onWatchedFileActivity)
+    .on('change', onWatchedFileActivity)
   setInterval(poll, FALLBACK_POLL_MS)
-  setInterval(refreshUsageFromCommand, USAGE_COMMAND_POLL_MS)
+  setInterval(maybeRefreshUsageFromCommand, FALLBACK_POLL_MS)
 })
 
 app.on('window-all-closed', () => {
