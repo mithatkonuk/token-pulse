@@ -51,11 +51,6 @@
   margin-bottom: 12px;
 }
 
-.widget-panel__header-info {
-  display: flex;
-  flex-direction: column;
-}
-
 .widget-panel__header-nav {
   display: flex;
   gap: 4px;
@@ -88,12 +83,6 @@
   margin-left: 6px;
   vertical-align: 1px;
   cursor: help;
-}
-
-.widget-panel__tier {
-  opacity: 0.6;
-  font-weight: 400;
-  font-size: 0.85em;
 }
 
 .usage-bar {
