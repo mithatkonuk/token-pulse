@@ -60,20 +60,17 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
   return (
     <div ref={panelRef} className="widget-panel" data-theme={dataTheme} style={accentStyle(state.settings)}>
       <div className="widget-panel__header">
-        <div className="widget-panel__header-info">
-          <span>
-            {state.currentModel ?? 'No recent activity'}
-            {state.currentModel && (
-              <span
-                className="widget-panel__model-qualifier"
-                title="The model that most recently produced output in any Claude session on this machine — not necessarily the one selected in the window you're looking at."
-              >
-                last active
-              </span>
-            )}
-          </span>
-          <span className="widget-panel__tier">{state.planTier ?? 'plan unknown'}</span>
-        </div>
+        <span>
+          {state.currentModel ?? 'No recent activity'}
+          {state.currentModel && (
+            <span
+              className="widget-panel__model-qualifier"
+              title="The model that most recently produced output in any Claude session on this machine — not necessarily the one selected in the window you're looking at."
+            >
+              last active
+            </span>
+          )}
+        </span>
         <div className="widget-panel__header-nav">
           {view !== 'usage' ? (
             <button className="widget-panel__icon-button" onClick={() => setView('usage')} aria-label="Back">
