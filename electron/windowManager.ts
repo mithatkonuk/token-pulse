@@ -3,7 +3,7 @@ import path from 'node:path'
 
 let popup: BrowserWindow | null = null
 
-export const POPUP_WIDTH = 320
+export const POPUP_WIDTH = 360
 
 export interface PopupSource {
   devServerUrl?: string
