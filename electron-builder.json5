@@ -14,6 +14,7 @@
   ],
   "mac": {
     "target": "dmg",
+    "icon": "build/icon.icns",
     "artifactName": "${productName}-Mac-${arch}-${version}-Installer.${ext}",
     "extendInfo": {
       "LSUIElement": true
@@ -21,6 +22,7 @@
   },
   "win": {
     "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "icon": "build/icon.ico",
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
   },
   "nsis": {
@@ -31,6 +33,7 @@
   },
   "linux": {
     "target": ["AppImage", "deb"],
+    "icon": "build/icon.png",
     "artifactName": "${productName}-Linux-${version}.${ext}"
   }
 }
