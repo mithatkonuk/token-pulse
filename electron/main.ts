@@ -47,16 +47,9 @@ let state: UsageState = {
   appVersion: app.getVersion(),
 }
 
-function resolveIsDarkMode(theme: AppSettings['theme']): boolean {
-  if (theme === 'system') {
-    return nativeTheme.shouldUseDarkColors
-  }
-  return theme === 'dark'
-}
-
 function pushState(): void {
   const fiveHour = state.windows.find((w) => w.id === 'five_hour')
-  updateTrayIcon(fiveHour?.percentUsed ?? 0, resolveIsDarkMode(state.settings.theme))
+  updateTrayIcon(fiveHour?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors)
   const popup = getPopupIfExists()
   if (popup && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
@@ -134,7 +127,8 @@ app.whenReady().then(() => {
     } else {
       poll()
     }
-  }, resolveIsDarkMode(state.settings.theme))
+  }, nativeTheme.shouldUseDarkColors)
+  nativeTheme.on('updated', pushState)
   poll()
   lastUsageCommandAt = Date.now()
   void refreshUsageFromCommand()
