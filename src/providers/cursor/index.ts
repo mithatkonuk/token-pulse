@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
 import { readCursorAccessToken } from './cursorAuth'
 import { fetchCurrentPeriodUsage, type CursorPeriodUsage } from './dashboardClient'
 
@@ -21,7 +22,7 @@ function formatResetDate(epochMs: number): string {
   return `resets ${formatted}`
 }
 
-export class CursorProvider {
+export class CursorProvider implements UsageProvider {
   private readonly chatsDir: string
   private readonly readAccessTokenFn: () => string | null
   private readonly fetchCurrentPeriodUsageFn: (accessToken: string) => Promise<CursorPeriodUsage | null>
@@ -41,17 +42,11 @@ export class CursorProvider {
     return this.lastPlanTier
   }
 
-  getCachedUsage(): { currentModel: string | null; contextWindow: null } {
+  getCachedUsage(): CachedUsage {
     return { currentModel: null, contextWindow: null }
   }
 
-  async getUsageFromCommand(): Promise<{
-    windows: Array<{ id: string; label: string; percentUsed: number; resetsText: string | null }>
-    contributing: null
-    cost: { spentCents: number; limitCents: number | null }
-    recentActivity: null
-    fetchedAt: string
-  } | null> {
+  async getUsageFromCommand(): Promise<CommandUsageResult | null> {
     const token = this.readAccessTokenFn()
     if (token === null) {
       return null
