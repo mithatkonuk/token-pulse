@@ -55,7 +55,7 @@ export function runUsageCommand(cwd: string, projectsDir: string): Promise<strin
   return new Promise((resolve) => {
     execFile(
       'claude',
-      ['-p', '/usage', '--session-id', sessionId, '--mcp-config', '{}', '--strict-mcp-config'],
+      ['-p', '/usage', '--session-id', sessionId, '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'],
       {
         cwd,
         timeout: USAGE_COMMAND_TIMEOUT_MS,
