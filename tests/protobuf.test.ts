@@ -4,7 +4,9 @@ import {
   getVarintNumber,
   getString,
   getSubmessage,
-  getDouble
+  getDouble,
+  getFloat,
+  getRepeatedSubmessages
 } from '../src/providers/cursor/protobuf'
 
 describe('decodeProtoFields', () => {
@@ -79,5 +81,34 @@ describe('decodeProtoFields', () => {
       throw new Error('expected wireType 5')
     }
     expect(value.bytes.equals(Buffer.from([0x01, 0x02, 0x03, 0x04]))).toBe(true)
+  })
+
+  it('decodes wire type 5 (32-bit float) via getFloat', () => {
+    // field 1, wire type 5: float32 1.5 little-endian = 00 00 C0 3F
+    const buf = Buffer.from([0x0d, 0x00, 0x00, 0xc0, 0x3f])
+    const fields = decodeProtoFields(buf)
+    expect(getFloat(fields, 1)).toBeCloseTo(1.5, 5)
+  })
+
+  it('returns null from getFloat for a field that was not present', () => {
+    const buf = Buffer.from([0x08, 0x01])
+    const fields = decodeProtoFields(buf)
+    expect(getFloat(fields, 5)).toBeNull()
+  })
+
+  it('decodes repeated submessages via getRepeatedSubmessages', () => {
+    // field 3 (submessage, appears twice): each containing field 1 (varint)
+    const buf = Buffer.from([0x1a, 0x02, 0x08, 0x01, 0x1a, 0x02, 0x08, 0x02])
+    const fields = decodeProtoFields(buf)
+    const subs = getRepeatedSubmessages(fields, 3)
+    expect(subs).toHaveLength(2)
+    expect(getVarintNumber(subs[0], 1)).toBe(1)
+    expect(getVarintNumber(subs[1], 1)).toBe(2)
+  })
+
+  it('returns an empty array from getRepeatedSubmessages when the field is absent', () => {
+    const buf = Buffer.from([0x08, 0x01])
+    const fields = decodeProtoFields(buf)
+    expect(getRepeatedSubmessages(fields, 5)).toEqual([])
   })
 })
