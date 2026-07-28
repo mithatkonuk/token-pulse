@@ -58,6 +58,11 @@ The current **model name** is read from the newest entry in `~/.claude/projects/
 
 ### Cursor
 
+<p>
+  <img src="docs/screenshots/claude-with-selector.png" width="320" alt="Claude Code view — header is now a clickable source selector">
+  <img src="docs/screenshots/cursor-usage.png" width="320" alt="Cursor view — billing-cycle usage, cost, and recent activity">
+</p>
+
 If Cursor's desktop app is installed and you're logged in, token-pulse reads the access token it already stores locally (`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, a plain SQLite key-value table — no separate login, nothing typed anywhere) and calls Cursor's own dashboard backend (`api2.cursor.sh`, the same Connect-RPC/protobuf API the Cursor desktop app itself uses) directly with it. Two calls: `GetCurrentPeriodUsage` for the billing-cycle % and cost, `GetFilteredUsageEvents` for the 5 most recent individual requests. Both are unofficial, undocumented endpoints — no published schema, no published rate limit — so Cursor's polling interval is deliberately more conservative than Claude's (5 minutes active vs. 3), with its own backoff-on-failure (doubling up to 1 hour) that Claude's provider doesn't need, since Claude's `/usage` is a supported, stable CLI command and Cursor's isn't.
 
 The token/cost field mapping for `GetFilteredUsageEvents` was reverse-engineered from a live response rather than a published schema — timestamp and model name are unambiguous, but the token-count and cost fields are a plausible, internally-consistent reading that hasn't been independently cross-checked against a second reference UI (unlike `GetCurrentPeriodUsage`'s fields, which were verified against the exact wording Cursor's own dashboard displays). If Cursor changes this API, these numbers are the most likely to drift first.
