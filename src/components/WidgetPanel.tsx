@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import type { UsageState, AppSettings } from '../shared/types'
+import type { AppState, AppSettings } from '../shared/types'
 import { UsageView } from './UsageView'
 import { SettingsView } from './SettingsView'
 import { AboutView } from './AboutView'
+import { SourceSelector } from './SourceSelector'
 import { BackIcon, SettingsIcon, InfoIcon } from './icons'
 
 type PanelView = 'usage' | 'settings' | 'about'
@@ -29,7 +30,7 @@ function accentStyle(settings: AppSettings): CSSProperties {
   } as CSSProperties
 }
 
-export function WidgetPanel({ state }: { state: UsageState | null }) {
+export function WidgetPanel({ state }: { state: AppState | null }) {
   const [view, setView] = useState<PanelView>('usage')
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -55,22 +56,26 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
       .catch((err: unknown) => console.error('Failed to update settings', err))
   }
 
+  function selectSource(sourceId: string): void {
+    window.ipcRenderer
+      .invoke('source:select', sourceId)
+      .catch((err: unknown) => console.error('Failed to select source', err))
+  }
+
+  const activeUsage = state.usageBySource[state.activeSourceId]
+  const activeSourceLabel = state.sources.find((s) => s.id === state.activeSourceId)?.label ?? ''
   const dataTheme = state.settings.theme === 'system' ? undefined : state.settings.theme
 
   return (
     <div ref={panelRef} className="widget-panel" data-theme={dataTheme} style={accentStyle(state.settings)}>
       <div className="widget-panel__header">
-        <span>
-          {state.currentModel ?? 'No recent activity'}
-          {state.currentModel && (
-            <span
-              className="widget-panel__model-qualifier"
-              title="The model that most recently produced output in any Claude session on this machine — not necessarily the one selected in the window you're looking at."
-            >
-              last active
-            </span>
-          )}
-        </span>
+        <SourceSelector
+          sources={state.sources}
+          activeSourceId={state.activeSourceId}
+          activeSourceLabel={activeSourceLabel}
+          currentModel={activeUsage.currentModel}
+          onSelect={selectSource}
+        />
         <div className="widget-panel__header-nav">
           {view !== 'usage' ? (
             <button className="widget-panel__icon-button" onClick={() => setView('usage')} aria-label="Back">
@@ -88,7 +93,7 @@ export function WidgetPanel({ state }: { state: UsageState | null }) {
           )}
         </div>
       </div>
-      {view === 'usage' && <UsageView state={state} />}
+      {view === 'usage' && <UsageView state={activeUsage} />}
       {view === 'settings' && <SettingsView settings={state.settings} onUpdate={updateSettings} />}
       {view === 'about' && <AboutView appVersion={state.appVersion} />}
     </div>
