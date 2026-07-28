@@ -11,8 +11,20 @@ export interface UsageCommandScheduleState {
   lastRefreshAt: number
 }
 
-export function shouldRefreshUsageCommand({ now, lastActivityAt, lastRefreshAt }: UsageCommandScheduleState): boolean {
-  const isIdle = now - lastActivityAt >= IDLE_THRESHOLD_MS
-  const interval = isIdle ? IDLE_INTERVAL_MS : ACTIVE_INTERVAL_MS
+export interface UsageCommandScheduleConfig {
+  activeIntervalMs?: number
+  idleIntervalMs?: number
+  idleThresholdMs?: number
+}
+
+export function shouldRefreshUsageCommand(
+  { now, lastActivityAt, lastRefreshAt }: UsageCommandScheduleState,
+  config: UsageCommandScheduleConfig = {}
+): boolean {
+  const activeIntervalMs = config.activeIntervalMs ?? ACTIVE_INTERVAL_MS
+  const idleIntervalMs = config.idleIntervalMs ?? IDLE_INTERVAL_MS
+  const idleThresholdMs = config.idleThresholdMs ?? IDLE_THRESHOLD_MS
+  const isIdle = now - lastActivityAt >= idleThresholdMs
+  const interval = isIdle ? idleIntervalMs : activeIntervalMs
   return now - lastRefreshAt >= interval
 }
