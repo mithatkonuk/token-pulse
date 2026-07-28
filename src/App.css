@@ -138,6 +138,27 @@
   font-weight: 600;
 }
 
+.usage-cost {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  margin-bottom: 8px;
+}
+
+.usage-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-activity__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8em;
+  opacity: 0.85;
+}
+
 .usage-bar {
   margin-bottom: 12px;
 }
