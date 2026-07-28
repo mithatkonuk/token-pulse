@@ -48,6 +48,10 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 
 ### Claude Code
 
+<p>
+  <img src="docs/screenshots/claude-with-selector.png" width="320" alt="Claude Code view — header is now a clickable source selector when Cursor is also detected">
+</p>
+
 **Usage bars and the limits breakdown** come from shelling out to `claude -p "/usage" --mcp-config '{"mcpServers":{}}' --strict-mcp-config` — the same slash command you'd run yourself in a terminal, with MCP servers explicitly disabled for that one-off call (this is a background polling call, not an interactive session — it has no use for whatever MCP servers happen to be configured, and loading them anyway was previously an unnecessary side effect, including spinning up unrelated local connections). It's a real subprocess call (~1-2s), and it's the only network-touching part of the app: `/usage` itself is a pure local command (no model/API-turn cost), but it does ask Claude's account-status endpoint for your real percentages. This call happens once at startup, then every 3 minutes while Claude is actively being used — deliberately not tied to popup-open, since each call has real latency and a real side effect (see below), not something worth paying on every UI interaction. If no watched session/cache file has changed for 15 minutes, the cadence backs off to every 20 minutes instead of polling on a fixed timer forever; the moment activity resumes, it snaps back to every 3 minutes on the next check.
 
 Every `-p` invocation starts a brand-new session, which writes a transcript file under `~/.claude/projects/<project-hash>/`. token-pulse pins the session ID itself (`--session-id`) and always runs from a dedicated scratch directory (`<userData>/usage-check-cwd`, never a real project), then deletes that exact transcript file right after reading the output — so this doesn't leave any of the usual per-session clutter behind, and it never gets attributed to whatever project you're actually working in.
@@ -59,7 +63,6 @@ The current **model name** is read from the newest entry in `~/.claude/projects/
 ### Cursor
 
 <p>
-  <img src="docs/screenshots/claude-with-selector.png" width="320" alt="Claude Code view — header is now a clickable source selector">
   <img src="docs/screenshots/cursor-usage.png" width="320" alt="Cursor view — billing-cycle usage, cost, and recent activity">
 </p>
 
