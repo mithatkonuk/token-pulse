@@ -3,13 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ContextWindow } from '../../shared/types'
 import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
+import { getContextWindowSizeForModel } from './modelContextWindows'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from './transcript'
-
-// Claude's standard context window size as of this writing. Only used when a transcript has
-// fresh token counts but the statusline cache (the only source for this number) has never
-// been populated at all — a real but narrow gap, since context_window_size is otherwise
-// stable and doesn't go stale the way total_input_tokens does.
-const DEFAULT_CONTEXT_WINDOW_SIZE = 1_000_000
 import { parseUsageOutput, runUsageCommand } from './usageCommand'
 
 interface StatuslineCache {
@@ -111,10 +106,11 @@ export class ClaudeCodeProvider implements UsageProvider {
     }
   }
 
-  // Token counts from the transcript are always fresh (Desktop writes it too), but
-  // context_window_size only ever comes from the statusline cache — falling back to a
-  // sensible default rather than dropping context-window display entirely on a machine
-  // that's never run a terminal session with a statusline configured.
+  // Token counts from the transcript are always fresh (Desktop writes it too). For
+  // context_window_size, the transcript's own model id — looked up in the static table Claude's
+  // own numbers were sourced from — is more trustworthy than the statusline cache (which could
+  // be for a model the user has since switched away from), so it takes priority; the cache is
+  // only consulted when the transcript doesn't name a model at all.
   private getContextWindowFromTranscript(): ContextWindow | null {
     const transcript = findNewestTranscript(this.projectsDir)
     if (transcript === null) {
@@ -125,7 +121,11 @@ export class ClaudeCodeProvider implements UsageProvider {
       return null
     }
     const totalInputTokens = usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens
-    const contextWindowSize = this.getContextWindowSizeFromStatuslineCache() ?? DEFAULT_CONTEXT_WINDOW_SIZE
+    const modelId = readLastModelId(transcript)
+    const contextWindowSize =
+      modelId !== null
+        ? getContextWindowSizeForModel(modelId)
+        : (this.getContextWindowSizeFromStatuslineCache() ?? getContextWindowSizeForModel(null))
     return {
       totalInputTokens,
       contextWindowSize,
