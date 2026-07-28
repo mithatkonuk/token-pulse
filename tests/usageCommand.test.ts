@@ -117,7 +117,7 @@ describe('runUsageCommand', () => {
     expect(result).toBe('usage output')
     expect(execFile).toHaveBeenCalledWith(
       'claude',
-      ['-p', '/usage', '--session-id', expect.any(String)],
+      ['-p', '/usage', '--session-id', expect.any(String), '--mcp-config', '{}', '--strict-mcp-config'],
       expect.objectContaining({ cwd: '/tmp' }),
       expect.any(Function)
     )
