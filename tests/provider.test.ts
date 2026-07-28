@@ -81,6 +81,57 @@ describe('ClaudeCodeProvider', () => {
     expect(provider().getCachedUsage().contextWindow).toBeNull()
   })
 
+  it('prefers a fresh token count from the transcript over a stale cached total, keeping the cached window size', () => {
+    fs.writeFileSync(
+      statuslineCachePath,
+      JSON.stringify({ context_window: { used_percentage: 3, total_input_tokens: 28701, context_window_size: 1000000 } })
+    )
+    const projectDir = path.join(projectsDir, 'my-project')
+    fs.mkdirSync(projectDir)
+    fs.writeFileSync(
+      path.join(projectDir, 'session.jsonl'),
+      JSON.stringify({
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 19, cache_read_input_tokens: 331300 } },
+      })
+    )
+    const contextWindow = provider().getCachedUsage().contextWindow
+    expect(contextWindow?.totalInputTokens).toBe(331321)
+    expect(contextWindow?.contextWindowSize).toBe(1000000)
+    expect(contextWindow?.usedPercentage).toBeCloseTo(33.1321, 4)
+  })
+
+  it('falls back to a default context window size when the transcript has usage but the cache is missing entirely', () => {
+    const projectDir = path.join(projectsDir, 'my-project')
+    fs.mkdirSync(projectDir)
+    fs.writeFileSync(
+      path.join(projectDir, 'session.jsonl'),
+      JSON.stringify({
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 19, cache_read_input_tokens: 331300 } },
+      })
+    )
+    const contextWindow = provider().getCachedUsage().contextWindow
+    expect(contextWindow?.totalInputTokens).toBe(331321)
+    expect(contextWindow?.contextWindowSize).toBe(1000000)
+    expect(contextWindow?.usedPercentage).toBeCloseTo(33.1321, 4)
+  })
+
+  it('falls back to the statusline cache entirely when the transcript has no usage data', () => {
+    fs.writeFileSync(
+      statuslineCachePath,
+      JSON.stringify({ context_window: { used_percentage: 27, total_input_tokens: 263600, context_window_size: 967000 } })
+    )
+    const projectDir = path.join(projectsDir, 'my-project')
+    fs.mkdirSync(projectDir)
+    fs.writeFileSync(path.join(projectDir, 'session.jsonl'), JSON.stringify({ type: 'user', message: { role: 'user' } }))
+    expect(provider().getCachedUsage().contextWindow).toEqual({
+      usedPercentage: 27,
+      totalInputTokens: 263600,
+      contextWindowSize: 967000,
+    })
+  })
+
   describe('getUsageFromCommand', () => {
     const USAGE_TEXT = `Current session: 6% used · resets Jul 26 at 4:30am (Europe/Berlin)
 Current week (all models): 79% used · resets Jul 26 at 10am (Europe/Berlin)
