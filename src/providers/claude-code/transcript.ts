@@ -16,8 +16,30 @@ const VERSIONED_MODEL_ID = /^claude-[a-z]+-\d[\d-]*$/
 const MODEL_COMMAND_STDOUT = /<local-command-stdout>Set model to (\S+)<\/local-command-stdout>/
 
 interface TranscriptEntry {
+  type?: unknown
   isSidechain?: unknown
-  message?: { model?: unknown; content?: unknown }
+  message?: { model?: unknown; content?: unknown; usage?: unknown }
+}
+
+export interface TranscriptUsage {
+  inputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+}
+
+function extractUsage(entry: TranscriptEntry): TranscriptUsage | null {
+  if (entry.type !== 'assistant') {
+    return null
+  }
+  const usage = entry.message?.usage
+  if (typeof usage !== 'object' || usage === null) {
+    return null
+  }
+  const u = usage as Record<string, unknown>
+  const inputTokens = typeof u.input_tokens === 'number' ? u.input_tokens : 0
+  const cacheCreationInputTokens = typeof u.cache_creation_input_tokens === 'number' ? u.cache_creation_input_tokens : 0
+  const cacheReadInputTokens = typeof u.cache_read_input_tokens === 'number' ? u.cache_read_input_tokens : 0
+  return { inputTokens, cacheCreationInputTokens, cacheReadInputTokens }
 }
 
 function extractModelId(entry: TranscriptEntry): string | null {
@@ -123,6 +145,40 @@ export function readLastModelId(file: string): string | null {
     const model = extractModelId(entry)
     if (model !== null) {
       return model
+    }
+  }
+  return null
+}
+
+/**
+ * Walks back from the end of a transcript for the newest main-thread assistant entry's raw
+ * token usage — the same numbers Claude Code's own statusline hook computes context-window
+ * occupancy from, but readable directly from the transcript rather than only from a cache
+ * that a hook has to be actively firing to keep fresh (see ClaudeCodeProvider).
+ */
+export function readLastUsage(file: string): TranscriptUsage | null {
+  const tail = readTail(file)
+  if (tail === null) {
+    return null
+  }
+  const lines = tail.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line.startsWith('{')) {
+      continue
+    }
+    let entry: TranscriptEntry
+    try {
+      entry = JSON.parse(line) as TranscriptEntry
+    } catch {
+      continue // Truncated by the tail read, or a partially flushed write.
+    }
+    if (entry.isSidechain === true) {
+      continue
+    }
+    const usage = extractUsage(entry)
+    if (usage !== null) {
+      return usage
     }
   }
   return null
