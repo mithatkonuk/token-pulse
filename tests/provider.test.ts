@@ -117,6 +117,29 @@ describe('ClaudeCodeProvider', () => {
     expect(contextWindow?.usedPercentage).toBeCloseTo(33.1321, 4)
   })
 
+  it('prefers the exact context window size for the transcript-reported model over a stale/wrong cached size', () => {
+    fs.writeFileSync(
+      statuslineCachePath,
+      JSON.stringify({ context_window: { used_percentage: 3, total_input_tokens: 28701, context_window_size: 1000000 } })
+    )
+    const projectDir = path.join(projectsDir, 'my-project')
+    fs.mkdirSync(projectDir)
+    fs.writeFileSync(
+      path.join(projectDir, 'session.jsonl'),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          model: 'claude-haiku-4-5-20251001',
+          usage: { input_tokens: 2, cache_creation_input_tokens: 19, cache_read_input_tokens: 51300 },
+        },
+      })
+    )
+    const contextWindow = provider().getCachedUsage().contextWindow
+    expect(contextWindow?.totalInputTokens).toBe(51321)
+    expect(contextWindow?.contextWindowSize).toBe(200_000)
+    expect(contextWindow?.usedPercentage).toBeCloseTo(25.6605, 4)
+  })
+
   it('falls back to the statusline cache entirely when the transcript has no usage data', () => {
     fs.writeFileSync(
       statuslineCachePath,
