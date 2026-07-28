@@ -2,7 +2,7 @@
   "name": "token-pulse",
   "description": "Shows your Claude usage limits from the menu bar.",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Mithat Konuk",
     "email": "mithatkonuk@gmail.com"
