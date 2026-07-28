@@ -107,3 +107,19 @@ export function getSubmessage(fields: ProtoFields, fieldNumber: number): ProtoFi
   }
   return decodeProtoFields(values[0].bytes)
 }
+
+export function getFloat(fields: ProtoFields, fieldNumber: number): number | null {
+  const values = fields.get(fieldNumber)
+  if (!values || values[0].wireType !== 5) {
+    return null
+  }
+  return values[0].bytes.readFloatLE(0)
+}
+
+export function getRepeatedSubmessages(fields: ProtoFields, fieldNumber: number): ProtoFields[] {
+  const values = fields.get(fieldNumber)
+  if (!values) {
+    return []
+  }
+  return values.filter((v) => v.wireType === 2).map((v) => decodeProtoFields(v.bytes))
+}
