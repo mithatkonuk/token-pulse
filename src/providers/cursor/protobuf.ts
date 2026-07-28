@@ -11,6 +11,9 @@ function readVarint(buf: Buffer, offset: number): [bigint, number] {
   let shift = 0n
   let pos = offset
   while (true) {
+    if (pos >= buf.length) {
+      throw new Error('truncated varint')
+    }
     const byte = buf[pos]
     result |= BigInt(byte & 0x7f) << shift
     pos++
@@ -37,16 +40,28 @@ export function decodeProtoFields(buf: Buffer, start = 0, end: number = buf.leng
       value = { wireType: 0, varint: v }
       pos = afterV
     } else if (wireType === 1) {
-      value = { wireType: 1, bytes: buf.subarray(pos, pos + 8) }
-      pos += 8
+      const fixedEnd = pos + 8
+      if (fixedEnd > end) {
+        throw new Error('truncated fixed64 field')
+      }
+      value = { wireType: 1, bytes: buf.subarray(pos, fixedEnd) }
+      pos = fixedEnd
     } else if (wireType === 2) {
       const [len, afterLen] = readVarint(buf, pos)
       const lenNum = Number(len)
-      value = { wireType: 2, bytes: buf.subarray(afterLen, afterLen + lenNum) }
-      pos = afterLen + lenNum
+      const sliceEnd = afterLen + lenNum
+      if (sliceEnd > end) {
+        throw new Error('truncated length-delimited field')
+      }
+      value = { wireType: 2, bytes: buf.subarray(afterLen, sliceEnd) }
+      pos = sliceEnd
     } else if (wireType === 5) {
-      value = { wireType: 5, bytes: buf.subarray(pos, pos + 4) }
-      pos += 4
+      const fixedEnd = pos + 4
+      if (fixedEnd > end) {
+        throw new Error('truncated fixed32 field')
+      }
+      value = { wireType: 5, bytes: buf.subarray(pos, fixedEnd) }
+      pos = fixedEnd
     } else {
       throw new Error(`unsupported protobuf wire type ${wireType}`)
     }
