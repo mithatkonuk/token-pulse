@@ -74,7 +74,10 @@ describe('decodeProtoFields', () => {
     const fields = decodeProtoFields(buf)
     const values = fields.get(1)
     expect(values).not.toBeNull()
-    expect(values![0].wireType).toBe(5)
-    expect(values![0].bytes.equals(Buffer.from([0x01, 0x02, 0x03, 0x04]))).toBe(true)
+    const value = values![0]
+    if (value.wireType !== 5) {
+      throw new Error('expected wireType 5')
+    }
+    expect(value.bytes.equals(Buffer.from([0x01, 0x02, 0x03, 0x04]))).toBe(true)
   })
 })
