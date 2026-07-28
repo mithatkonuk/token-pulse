@@ -12,7 +12,11 @@ import { readCursorAccessToken } from '../src/providers/cursor/cursorAuth'
 import type { UsageProvider } from '../src/providers/types'
 import type { AppState, AppSettings, SourceUsage } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
-import { shouldRefreshUsageCommand, ACTIVE_INTERVAL_MS } from '../src/main/usageCommandScheduler'
+import {
+  shouldRefreshUsageCommand,
+  shouldRefreshOnOpen,
+  ACTIVE_INTERVAL_MS,
+} from '../src/main/usageCommandScheduler'
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -159,6 +163,26 @@ function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
   }
 }
 
+function refreshUsageFromCommandOnOpen(source: SourceRuntime): void {
+  // Someone looking at the panel is activity, so a source that had gone idle must not stay on
+  // the 20-minute cadence for its next scheduled refresh either.
+  source.lastActivityAt = Date.now()
+  if (source.refreshInFlight) {
+    return
+  }
+  const baseActiveIntervalMs = source.activeIntervalMs ?? ACTIVE_INTERVAL_MS
+  const floorMs =
+    source.consecutiveFailures > 0
+      ? computeBackoffIntervalMs(baseActiveIntervalMs, source.consecutiveFailures)
+      : undefined
+  if (!shouldRefreshOnOpen({ now: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt }, floorMs)) {
+    return
+  }
+  source.lastRefreshAt = source.lastActivityAt
+  source.refreshInFlight = true
+  void refreshUsageFromCommand(source)
+}
+
 async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
   try {
     const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
@@ -227,12 +251,15 @@ app.whenReady().then(() => {
   createTray((trayRef) => {
     const wasVisible = getPopupIfExists()?.isVisible() ?? false
     togglePopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
-    // Opening: re-read from disk so the panel never shows a watch event we haven't caught yet.
+    // Opening: re-read from disk so the panel never shows a watch event we haven't caught yet,
+    // and kick off a usage-command refresh so the limit bars aren't a whole cadence behind
+    // Claude's own panel at the exact moment someone is comparing them.
     // Closing: nothing to render, so just keep the tray icon in sync without a redundant read.
     if (wasVisible) {
       pushState()
     } else {
       sources.forEach(poll)
+      sources.forEach(refreshUsageFromCommandOnOpen)
     }
   }, nativeTheme.shouldUseDarkColors)
   nativeTheme.on('updated', pushState)

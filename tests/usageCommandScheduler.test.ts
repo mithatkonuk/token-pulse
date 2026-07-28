@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   shouldRefreshUsageCommand,
+  shouldRefreshOnOpen,
   ACTIVE_INTERVAL_MS,
   IDLE_INTERVAL_MS,
   IDLE_THRESHOLD_MS,
+  OPEN_REFRESH_MIN_INTERVAL_MS,
 } from '../src/main/usageCommandScheduler'
 
 describe('shouldRefreshUsageCommand', () => {
@@ -67,5 +69,23 @@ describe('shouldRefreshUsageCommand with a custom config', () => {
     expect(
       shouldRefreshUsageCommand({ now: ACTIVE_INTERVAL_MS, lastActivityAt: 0, lastRefreshAt: 0 }, {})
     ).toBe(true)
+  })
+})
+
+describe('shouldRefreshOnOpen', () => {
+  it('refreshes even when the regular active interval has not elapsed yet', () => {
+    const now = OPEN_REFRESH_MIN_INTERVAL_MS
+    expect(shouldRefreshUsageCommand({ now, lastActivityAt: now, lastRefreshAt: 0 })).toBe(false)
+    expect(shouldRefreshOnOpen({ now, lastRefreshAt: 0 })).toBe(true)
+  })
+
+  it('does not refresh when one just finished, so repeated clicks cannot spawn a subprocess each time', () => {
+    expect(shouldRefreshOnOpen({ now: OPEN_REFRESH_MIN_INTERVAL_MS - 1, lastRefreshAt: 0 })).toBe(false)
+  })
+
+  it('honours a widened floor so a failing source keeps its backoff', () => {
+    const backoffMs = 10 * 60 * 1000
+    expect(shouldRefreshOnOpen({ now: backoffMs - 1, lastRefreshAt: 0 }, backoffMs)).toBe(false)
+    expect(shouldRefreshOnOpen({ now: backoffMs, lastRefreshAt: 0 }, backoffMs)).toBe(true)
   })
 })
