@@ -1,5 +1,5 @@
 export interface UsageWindow {
-  id: 'five_hour' | 'weekly'
+  id: string
   label: string
   percentUsed: number
   resetsText: string | null
@@ -31,6 +31,18 @@ export interface ContextWindow {
   contextWindowSize: number
 }
 
+export interface UsageEvent {
+  timestamp: string
+  model: string
+  tokens: number
+  costCents: number | null
+}
+
+export interface CostSummary {
+  spentCents: number
+  limitCents: number | null
+}
+
 export interface AppSettings {
   startAtLogin: boolean
   theme: 'dark' | 'light' | 'system'
@@ -39,14 +51,27 @@ export interface AppSettings {
   fontSize: 'small' | 'medium' | 'large'
 }
 
-export interface UsageState {
+export interface SourceUsage {
   planTier: string | null
   currentModel: string | null
   windows: UsageWindow[]
   contextWindow: ContextWindow | null
   contributing: Contributing | null
+  cost: CostSummary | null
+  recentActivity: UsageEvent[] | null
   updatedAt: string
   cacheUpdatedAt: string | null
+}
+
+export interface SourceDescriptor {
+  id: string
+  label: string
+}
+
+export interface AppState {
+  sources: SourceDescriptor[]
+  activeSourceId: string
+  usageBySource: Record<string, SourceUsage>
   settings: AppSettings
   appVersion: string
 }
