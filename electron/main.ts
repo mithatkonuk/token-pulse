@@ -7,9 +7,13 @@ import { createTray, updateTrayIcon } from './tray'
 import { togglePopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
-import type { UsageState, AppSettings } from '../src/shared/types'
+import { CursorProvider } from '../src/providers/cursor'
+import { readCursorAccessToken } from '../src/providers/cursor/cursorAuth'
+import type { UsageProvider } from '../src/providers/types'
+import type { AppState, AppSettings, SourceUsage } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
-import { shouldRefreshUsageCommand } from '../src/main/usageCommandScheduler'
+import { shouldRefreshUsageCommand, ACTIVE_INTERVAL_MS } from '../src/main/usageCommandScheduler'
+import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -19,82 +23,162 @@ const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 const PRELOAD_PATH = path.join(__dirname, 'preload.mjs')
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 
-// Safety net in case the file watcher misses an event (rare, but fs watching
-// isn't 100% reliable cross-platform) — normal updates are watch-driven, not timed.
+// Safety net in case a file watcher misses an event (rare, but fs watching isn't
+// 100% reliable cross-platform) — normal updates are watch-driven, not timed.
 const FALLBACK_POLL_MS = 60 * 1000
+
+// Cursor's API is unofficial and undocumented, so it gets a more conservative
+// baseline than Claude's supported CLI command.
+const CURSOR_ACTIVE_INTERVAL_MS = 5 * 60 * 1000
 
 // A dedicated scratch directory, never a real project's cwd, so these recurring background
 // calls don't get attributed to whatever project you're actually working in.
 const USAGE_COMMAND_CWD = path.join(app.getPath('userData'), 'usage-check-cwd')
 fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
 
-const provider = new ClaudeCodeProvider()
+interface SourceRuntime {
+  id: string
+  label: string
+  provider: UsageProvider
+  activeIntervalMs?: number
+  lastActivityAt: number
+  lastRefreshAt: number
+  consecutiveFailures: number
+}
 
-// Tracks real Claude activity (any watched session/cache file write) so the /usage command
-// cadence can back off when nothing's happening instead of polling on a fixed timer forever.
-let lastActivityAt = Date.now()
-let lastUsageCommandAt = 0
+// Cursor is only registered if a token is actually present, so a machine without Cursor
+// installed/logged in still shows the single-source (no dropdown) experience unchanged.
+const cursorAvailable = readCursorAccessToken() !== null
 
-let state: UsageState = {
-  planTier: provider.getPlanTier(),
-  currentModel: null,
-  windows: [],
-  contextWindow: null,
-  contributing: null,
-  updatedAt: new Date().toISOString(),
-  cacheUpdatedAt: null,
+const sources: SourceRuntime[] = [
+  {
+    id: 'claude',
+    label: 'Claude Code',
+    provider: new ClaudeCodeProvider(),
+    lastActivityAt: Date.now(),
+    lastRefreshAt: 0,
+    consecutiveFailures: 0,
+  },
+  ...(cursorAvailable
+    ? [
+        {
+          id: 'cursor',
+          label: 'Cursor',
+          provider: new CursorProvider(),
+          activeIntervalMs: CURSOR_ACTIVE_INTERVAL_MS,
+          lastActivityAt: Date.now(),
+          lastRefreshAt: 0,
+          consecutiveFailures: 0,
+        },
+      ]
+    : []),
+]
+
+function emptySourceUsage(): SourceUsage {
+  return {
+    planTier: null,
+    currentModel: null,
+    windows: [],
+    contextWindow: null,
+    contributing: null,
+    cost: null,
+    recentActivity: null,
+    updatedAt: new Date().toISOString(),
+    cacheUpdatedAt: null,
+  }
+}
+
+let state: AppState = {
+  sources: sources.map((s) => ({ id: s.id, label: s.label })),
+  activeSourceId: 'claude',
+  usageBySource: Object.fromEntries(sources.map((s) => [s.id, emptySourceUsage()])),
   settings: readSettings(SETTINGS_PATH),
   appVersion: app.getVersion(),
 }
 
 function pushState(): void {
-  const fiveHour = state.windows.find((w) => w.id === 'five_hour')
-  updateTrayIcon(fiveHour?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors)
+  const activeUsage = state.usageBySource[state.activeSourceId]
+  const primaryWindow = activeUsage.windows[0]
+  updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors)
   const popup = getPopupIfExists()
   if (popup && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
   }
 }
 
-function poll(): void {
-  const cached = provider.getCachedUsage()
+function poll(source: SourceRuntime): void {
+  const cached = source.provider.getCachedUsage()
+  const existing = state.usageBySource[source.id]
   state = {
     ...state,
-    planTier: provider.getPlanTier(),
-    currentModel: cached.currentModel,
-    contextWindow: cached.contextWindow,
-    updatedAt: new Date().toISOString(),
+    usageBySource: {
+      ...state.usageBySource,
+      [source.id]: {
+        ...existing,
+        planTier: source.provider.getPlanTier(),
+        currentModel: cached.currentModel,
+        contextWindow: cached.contextWindow,
+        updatedAt: new Date().toISOString(),
+      },
+    },
   }
   pushState()
 }
 
-function onWatchedFileActivity(): void {
-  lastActivityAt = Date.now()
-  poll()
+function onWatchedFileActivity(source: SourceRuntime): void {
+  source.lastActivityAt = Date.now()
+  poll(source)
 }
 
-function maybeRefreshUsageFromCommand(): void {
-  if (shouldRefreshUsageCommand({ now: Date.now(), lastActivityAt, lastRefreshAt: lastUsageCommandAt })) {
-    lastUsageCommandAt = Date.now()
-    void refreshUsageFromCommand()
+function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
+  const now = Date.now()
+  const baseActiveIntervalMs = source.activeIntervalMs ?? ACTIVE_INTERVAL_MS
+  const effectiveActiveIntervalMs = computeBackoffIntervalMs(baseActiveIntervalMs, source.consecutiveFailures)
+  if (
+    shouldRefreshUsageCommand(
+      { now, lastActivityAt: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt },
+      { activeIntervalMs: effectiveActiveIntervalMs }
+    )
+  ) {
+    source.lastRefreshAt = now
+    void refreshUsageFromCommand(source)
   }
 }
 
-async function refreshUsageFromCommand(): Promise<void> {
-  const result = await provider.getUsageFromCommand(USAGE_COMMAND_CWD)
+async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
+  const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
   if (result === null) {
+    source.consecutiveFailures += 1
     return
   }
+  source.consecutiveFailures = 0
+  const existing = state.usageBySource[source.id]
   state = {
     ...state,
-    windows: result.windows,
-    contributing: result.contributing,
-    cacheUpdatedAt: result.fetchedAt,
+    usageBySource: {
+      ...state.usageBySource,
+      [source.id]: {
+        ...existing,
+        windows: result.windows,
+        contributing: result.contributing,
+        cost: result.cost,
+        recentActivity: result.recentActivity,
+        cacheUpdatedAt: result.fetchedAt,
+      },
+    },
   }
   pushState()
 }
 
 ipcMain.handle('usage:get', () => state)
+
+ipcMain.handle('source:select', (_event, sourceId: string) => {
+  if (state.usageBySource[sourceId] === undefined) {
+    return
+  }
+  state = { ...state, activeSourceId: sourceId }
+  pushState()
+})
 
 ipcMain.handle('settings:update', (_event, patch: Partial<AppSettings>) => {
   const next: AppSettings = { ...state.settings, ...patch }
@@ -125,23 +209,28 @@ app.whenReady().then(() => {
     if (wasVisible) {
       pushState()
     } else {
-      poll()
+      sources.forEach(poll)
     }
   }, nativeTheme.shouldUseDarkColors)
   nativeTheme.on('updated', pushState)
-  poll()
-  lastUsageCommandAt = Date.now()
-  void refreshUsageFromCommand()
-  chokidar
-    .watch(provider.getWatchedPaths(), {
-      ignoreInitial: true,
-      atomic: true,
-      awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
-    })
-    .on('add', onWatchedFileActivity)
-    .on('change', onWatchedFileActivity)
-  setInterval(poll, FALLBACK_POLL_MS)
-  setInterval(maybeRefreshUsageFromCommand, FALLBACK_POLL_MS)
+  sources.forEach(poll)
+  const now = Date.now()
+  sources.forEach((s) => {
+    s.lastRefreshAt = now
+  })
+  sources.forEach((s) => void refreshUsageFromCommand(s))
+  sources.forEach((source) => {
+    chokidar
+      .watch(source.provider.getWatchedPaths(), {
+        ignoreInitial: true,
+        atomic: true,
+        awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+      })
+      .on('add', () => onWatchedFileActivity(source))
+      .on('change', () => onWatchedFileActivity(source))
+  })
+  setInterval(() => sources.forEach(poll), FALLBACK_POLL_MS)
+  setInterval(() => sources.forEach(maybeRefreshUsageFromCommand), FALLBACK_POLL_MS)
 })
 
 app.on('window-all-closed', () => {
