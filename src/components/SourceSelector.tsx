@@ -59,7 +59,15 @@ export function SourceSelector({
   return (
     <div className="source-selector" ref={containerRef}>
       <button className="source-selector__trigger" onClick={() => setIsOpen((open) => !open)}>
-        {activeSourceLabel}
+        {currentModel ?? activeSourceLabel}
+        {currentModel && (
+          <span
+            className="widget-panel__model-qualifier"
+            title="The model that most recently produced output in any Claude session on this machine — not necessarily the one selected in the window you're looking at."
+          >
+            last active
+          </span>
+        )}
         <ChevronDownIcon />
       </button>
       {isOpen && (

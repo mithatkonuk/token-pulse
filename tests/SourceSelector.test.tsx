@@ -27,6 +27,34 @@ describe('SourceSelector', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it('shows the active model name (not the generic source label) on the trigger when one is known', () => {
+    render(
+      <SourceSelector
+        sources={TWO_SOURCES}
+        activeSourceId="claude"
+        activeSourceLabel="Claude Code"
+        currentModel="Sonnet 5"
+        onSelect={() => {}}
+      />
+    )
+    const trigger = screen.getByRole('button')
+    expect(trigger).toHaveTextContent('Sonnet 5')
+    expect(trigger).not.toHaveTextContent('Claude Code')
+  })
+
+  it('falls back to the source label on the trigger when no model is known (e.g. Cursor)', () => {
+    render(
+      <SourceSelector
+        sources={TWO_SOURCES}
+        activeSourceId="cursor"
+        activeSourceLabel="Cursor"
+        currentModel={null}
+        onSelect={() => {}}
+      />
+    )
+    expect(screen.getByRole('button')).toHaveTextContent('Cursor')
+  })
+
   it('opens a menu listing every source when there is more than one', () => {
     render(
       <SourceSelector
