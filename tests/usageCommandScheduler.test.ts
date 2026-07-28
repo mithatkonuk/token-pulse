@@ -43,3 +43,29 @@ describe('shouldRefreshUsageCommand', () => {
     expect(shouldRefreshUsageCommand({ now, lastActivityAt, lastRefreshAt })).toBe(true)
   })
 })
+
+describe('shouldRefreshUsageCommand with a custom config', () => {
+  it('uses the overridden active interval instead of the default', () => {
+    const lastActivityAt = 0
+    const lastRefreshAt = 0
+    const customActiveMs = 5 * 60 * 1000
+    expect(
+      shouldRefreshUsageCommand(
+        { now: customActiveMs - 1, lastActivityAt, lastRefreshAt },
+        { activeIntervalMs: customActiveMs }
+      )
+    ).toBe(false)
+    expect(
+      shouldRefreshUsageCommand(
+        { now: customActiveMs, lastActivityAt, lastRefreshAt },
+        { activeIntervalMs: customActiveMs }
+      )
+    ).toBe(true)
+  })
+
+  it('falls back to the module defaults for any field left unspecified', () => {
+    expect(
+      shouldRefreshUsageCommand({ now: ACTIVE_INTERVAL_MS, lastActivityAt: 0, lastRefreshAt: 0 }, {})
+    ).toBe(true)
+  })
+})

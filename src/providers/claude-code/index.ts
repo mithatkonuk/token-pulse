@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { ContextWindow, Contributing, UsageWindow } from '../../shared/types'
+import type { ContextWindow } from '../../shared/types'
+import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId } from './transcript'
 import { parseUsageOutput, runUsageCommand } from './usageCommand'
 
@@ -14,17 +15,6 @@ interface StatuslineCache {
   }
 }
 
-export interface CachedUsage {
-  currentModel: string | null
-  contextWindow: ContextWindow | null
-}
-
-export interface CommandUsage {
-  windows: UsageWindow[]
-  contributing: Contributing
-  fetchedAt: string
-}
-
 export interface ClaudeCodeProviderOptions {
   claudeJsonPath?: string
   statuslineCachePath?: string
@@ -32,7 +22,7 @@ export interface ClaudeCodeProviderOptions {
   runUsageCommandFn?: (cwd: string) => Promise<string | null>
 }
 
-export class ClaudeCodeProvider {
+export class ClaudeCodeProvider implements UsageProvider {
   private readonly claudeJsonPath: string
   private readonly statuslineCachePath: string
   private readonly projectsDir: string
@@ -111,14 +101,14 @@ export class ClaudeCodeProvider {
     }
   }
 
-  async getUsageFromCommand(cwd: string): Promise<CommandUsage | null> {
+  async getUsageFromCommand(cwd: string): Promise<CommandUsageResult | null> {
     const stdout = await this.runUsageCommandFn(cwd)
     if (stdout === null) {
       return null
     }
     const parsed = parseUsageOutput(stdout)
 
-    const windows: UsageWindow[] = []
+    const windows: CommandUsageResult['windows'] = []
     if (parsed.fiveHour) {
       windows.push({ id: 'five_hour', label: 'Every 5 hours', percentUsed: parsed.fiveHour.percentUsed, resetsText: parsed.fiveHour.resetsText })
     }
@@ -129,6 +119,8 @@ export class ClaudeCodeProvider {
     return {
       windows,
       contributing: { last24h: parsed.last24h, last7d: parsed.last7d },
+      cost: null,
+      recentActivity: null,
       fetchedAt: new Date().toISOString(),
     }
   }

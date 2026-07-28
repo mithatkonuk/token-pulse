@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ContributingStats, TopEntry, UsageState } from '../shared/types'
+import type { ContributingStats, TopEntry, SourceUsage } from '../shared/types'
 import { formatCompactNumber, formatPlanTier, formatRelativeTime } from '../shared/format'
 import { UsageBar } from './UsageBar'
 
@@ -20,7 +20,7 @@ function TopEntriesRow({ label, entries }: { label: string; entries: TopEntry[] 
   )
 }
 
-function ContributingStatsSection({ contributing }: { contributing: UsageState['contributing'] }) {
+function ContributingStatsSection({ contributing }: { contributing: SourceUsage['contributing'] }) {
   const [range, setRange] = useState<'last24h' | 'last7d'>('last24h')
   if (!contributing || (!contributing.last24h && !contributing.last7d)) {
     return null
@@ -62,9 +62,50 @@ function ContributingStatsSection({ contributing }: { contributing: UsageState['
   )
 }
 
-export function UsageView({ state }: { state: UsageState }) {
-  const fiveHour = state.windows.find((w) => w.id === 'five_hour')
-  const weekly = state.windows.find((w) => w.id === 'weekly')
+function formatCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`
+}
+
+function CostSection({ cost }: { cost: SourceUsage['cost'] }) {
+  if (!cost) {
+    return null
+  }
+  return (
+    <>
+      <hr className="widget-panel__separator" />
+      <div className="usage-cost">
+        <span>Spent this period</span>
+        <span>
+          {formatCents(cost.spentCents)}
+          {cost.limitCents !== null && ` / ${formatCents(cost.limitCents)}`}
+        </span>
+      </div>
+    </>
+  )
+}
+
+function ActivitySection({ recentActivity }: { recentActivity: SourceUsage['recentActivity'] }) {
+  if (!recentActivity || recentActivity.length === 0) {
+    return null
+  }
+  return (
+    <>
+      <hr className="widget-panel__separator" />
+      <div className="widget-panel__section-label">Recent activity</div>
+      <div className="usage-activity">
+        {recentActivity.map((event, index) => (
+          <div className="usage-activity__row" key={`${event.timestamp}-${index}`}>
+            <span className="usage-activity__model">{event.model}</span>
+            <span className="usage-activity__tokens">{formatCompactNumber(event.tokens)} tok</span>
+            <span className="usage-activity__cost">{event.costCents !== null ? formatCents(event.costCents) : '—'}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+export function UsageView({ state }: { state: SourceUsage }) {
   const contextWindow = state.contextWindow
   return (
     <>
@@ -88,15 +129,16 @@ export function UsageView({ state }: { state: UsageState }) {
           <hr className="widget-panel__separator" />
         </>
       )}
-      {(fiveHour || weekly) && (
+      {state.windows.length > 0 && (
         <div className="widget-panel__section-label">Plan usage limits · {formatPlanTier(state.planTier)}</div>
       )}
-      {fiveHour && <UsageBar window={fiveHour} />}
-      {weekly && <UsageBar window={weekly} />}
-      {state.windows.length === 0 && (
-        <div className="widget-panel__empty">No usage data yet — open a Claude Code session to populate this.</div>
-      )}
+      {state.windows.map((window) => (
+        <UsageBar key={window.id} window={window} />
+      ))}
+      {state.windows.length === 0 && <div className="widget-panel__empty">No usage data yet.</div>}
+      <CostSection cost={state.cost} />
       <ContributingStatsSection contributing={state.contributing} />
+      <ActivitySection recentActivity={state.recentActivity} />
       {state.cacheUpdatedAt && (
         <>
           <hr className="widget-panel__separator" />
