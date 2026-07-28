@@ -37,6 +37,14 @@ export function InfoIcon() {
   )
 }
 
+export function ChevronDownIcon() {
+  return (
+    <svg {...ICON_PROPS} width={11} height={11}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
 export function MailIcon() {
   return (
     <svg {...ICON_PROPS}>
