@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { findNewestTranscript, formatModelDisplayName, readLastModelId } from '../src/providers/claude-code/transcript'
+import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from '../src/providers/claude-code/transcript'
 
 let dir: string
 
@@ -109,6 +109,65 @@ describe('readLastModelId', () => {
     const file = path.join(filePath, 'session.jsonl')
     fs.writeFileSync(file, `${JSON.stringify({ message: { model: 'claude-opus-5' } })}\n{not valid json`)
     expect(readLastModelId(file)).toBe('claude-opus-5')
+  })
+})
+
+describe('readLastUsage', () => {
+  it('returns the usage from the last main-thread assistant entry', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      {
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 100, cache_read_input_tokens: 200 } },
+      },
+      {
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 16138, cache_read_input_tokens: 12561 } },
+      },
+    ])
+    expect(readLastUsage(file)).toEqual({ inputTokens: 2, cacheCreationInputTokens: 16138, cacheReadInputTokens: 12561 })
+  })
+
+  it('skips sidechain (subagent) entries', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      {
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 100, cache_read_input_tokens: 200 } },
+      },
+      {
+        type: 'assistant',
+        isSidechain: true,
+        message: { usage: { input_tokens: 9, cache_creation_input_tokens: 9, cache_read_input_tokens: 9 } },
+      },
+    ])
+    expect(readLastUsage(file)).toEqual({ inputTokens: 2, cacheCreationInputTokens: 100, cacheReadInputTokens: 200 })
+  })
+
+  it('skips non-assistant entries and entries with no usage', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      {
+        type: 'assistant',
+        message: { usage: { input_tokens: 2, cache_creation_input_tokens: 100, cache_read_input_tokens: 200 } },
+      },
+      { type: 'user', message: { role: 'user', content: 'hi' } },
+      { type: 'custom-title' },
+    ])
+    expect(readLastUsage(file)).toEqual({ inputTokens: 2, cacheCreationInputTokens: 100, cacheReadInputTokens: 200 })
+  })
+
+  it('treats missing numeric fields as 0', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [
+      { type: 'assistant', message: { usage: { input_tokens: 5 } } },
+    ])
+    expect(readLastUsage(file)).toEqual({ inputTokens: 5, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 })
+  })
+
+  it('returns null when the file does not exist', () => {
+    expect(readLastUsage(path.join(dir, 'missing.jsonl'))).toBeNull()
+  })
+
+  it('returns null when no entry has usage', () => {
+    const file = writeTranscript('proj-a', 'session.jsonl', [{ type: 'user', message: { role: 'user', content: 'hi' } }])
+    expect(readLastUsage(file)).toBeNull()
   })
 })
 
