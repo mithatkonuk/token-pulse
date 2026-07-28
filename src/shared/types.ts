@@ -1,5 +1,5 @@
 export interface UsageWindow {
-  id: 'five_hour' | 'weekly'
+  id: string
   label: string
   percentUsed: number
   resetsText: string | null

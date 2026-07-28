@@ -101,8 +101,8 @@ Last 7d · 3998 requests · 9 sessions
         { id: 'five_hour', label: 'Every 5 hours', percentUsed: 6, resetsText: 'Jul 26 at 4:30am (Europe/Berlin)' },
         { id: 'weekly', label: 'Weekly', percentUsed: 79, resetsText: 'Jul 26 at 10am (Europe/Berlin)' },
       ])
-      expect(result!.contributing.last24h).toMatchObject({ requests: 350, sessions: 2, aboveContextPercent: 90 })
-      expect(result!.contributing.last7d!.topPlugins).toEqual([{ name: 'superpowers', percent: 8 }])
+      expect(result!.contributing!.last24h).toMatchObject({ requests: 350, sessions: 2, aboveContextPercent: 90 })
+      expect(result!.contributing!.last7d!.topPlugins).toEqual([{ name: 'superpowers', percent: 8 }])
     })
 
     it('passes the given cwd through to the injected command runner', async () => {
