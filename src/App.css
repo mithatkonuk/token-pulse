@@ -85,6 +85,59 @@
   cursor: help;
 }
 
+.source-selector {
+  position: relative;
+}
+
+.source-selector__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.source-selector__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  background: var(--bg-color);
+  border: 1px solid var(--track-bg);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.source-selector__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.source-selector__item:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.source-selector__item.is-active {
+  font-weight: 600;
+}
+
 .usage-bar {
   margin-bottom: 12px;
 }
