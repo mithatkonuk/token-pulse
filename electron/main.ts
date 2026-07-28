@@ -44,6 +44,7 @@ interface SourceRuntime {
   lastActivityAt: number
   lastRefreshAt: number
   consecutiveFailures: number
+  refreshInFlight: boolean
 }
 
 // Cursor is only registered if a token is actually present, so a machine without Cursor
@@ -58,6 +59,7 @@ const sources: SourceRuntime[] = [
     lastActivityAt: Date.now(),
     lastRefreshAt: 0,
     consecutiveFailures: 0,
+    refreshInFlight: false,
   },
   ...(cursorAvailable
     ? [
@@ -69,6 +71,7 @@ const sources: SourceRuntime[] = [
           lastActivityAt: Date.now(),
           lastRefreshAt: 0,
           consecutiveFailures: 0,
+          refreshInFlight: false,
         },
       ]
     : []),
@@ -131,43 +134,63 @@ function onWatchedFileActivity(source: SourceRuntime): void {
 }
 
 function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
+  if (source.refreshInFlight) {
+    return
+  }
   const now = Date.now()
   const baseActiveIntervalMs = source.activeIntervalMs ?? ACTIVE_INTERVAL_MS
   const effectiveActiveIntervalMs = computeBackoffIntervalMs(baseActiveIntervalMs, source.consecutiveFailures)
+  // Once a source is idle, shouldRefreshUsageCommand switches to IDLE_INTERVAL_MS and ignores
+  // activeIntervalMs entirely — so a backed-off source must also widen idleIntervalMs, or a
+  // persistent failure gets retried every 20 minutes forever instead of respecting the backoff cap.
+  const scheduleConfig =
+    source.consecutiveFailures > 0
+      ? { activeIntervalMs: effectiveActiveIntervalMs, idleIntervalMs: effectiveActiveIntervalMs }
+      : { activeIntervalMs: effectiveActiveIntervalMs }
   if (
     shouldRefreshUsageCommand(
       { now, lastActivityAt: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt },
-      { activeIntervalMs: effectiveActiveIntervalMs }
+      scheduleConfig
     )
   ) {
     source.lastRefreshAt = now
+    source.refreshInFlight = true
     void refreshUsageFromCommand(source)
   }
 }
 
 async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
-  const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
-  if (result === null) {
-    source.consecutiveFailures += 1
-    return
-  }
-  source.consecutiveFailures = 0
-  const existing = state.usageBySource[source.id]
-  state = {
-    ...state,
-    usageBySource: {
-      ...state.usageBySource,
-      [source.id]: {
-        ...existing,
-        windows: result.windows,
-        contributing: result.contributing,
-        cost: result.cost,
-        recentActivity: result.recentActivity,
-        cacheUpdatedAt: result.fetchedAt,
+  try {
+    const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
+    if (result === null) {
+      source.consecutiveFailures += 1
+      return
+    }
+    source.consecutiveFailures = 0
+    const existing = state.usageBySource[source.id]
+    state = {
+      ...state,
+      usageBySource: {
+        ...state.usageBySource,
+        [source.id]: {
+          ...existing,
+          windows: result.windows,
+          contributing: result.contributing,
+          cost: result.cost,
+          recentActivity: result.recentActivity,
+          cacheUpdatedAt: result.fetchedAt,
+        },
       },
-    },
+    }
+    pushState()
+  } catch {
+    // A provider throwing (e.g. fetch rejecting on a network-level failure — offline, DNS,
+    // TLS) must not become an unhandled rejection in the main process; treat it the same as
+    // an explicit null result so the failure backoff still engages.
+    source.consecutiveFailures += 1
+  } finally {
+    source.refreshInFlight = false
   }
-  pushState()
 }
 
 ipcMain.handle('usage:get', () => state)
@@ -217,6 +240,7 @@ app.whenReady().then(() => {
   const now = Date.now()
   sources.forEach((s) => {
     s.lastRefreshAt = now
+    s.refreshInFlight = true
   })
   sources.forEach((s) => void refreshUsageFromCommand(s))
   sources.forEach((source) => {
