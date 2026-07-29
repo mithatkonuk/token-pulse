@@ -34,7 +34,7 @@ A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your
 ## Features
 
 - **Two usage bars** — 5-hour and weekly rate-limit percentage, with the plain-language reset time Claude Code itself reports
-- **Tray title tells you which window you're looking at** — the menu-bar percentage is prefixed with `5h` or `Weekly` so it's never ambiguous which limit is closest to being hit
+- **Tray title tells you which window you're looking at** — the menu-bar percentage is suffixed with `5h`, `Wk`, or (for Cursor) `Mo`, so it's never ambiguous which limit is closest to being hit
 - **What's using your limits** — a 24h/7d breakdown of top skills, subagents, plugins, and MCP servers, straight from `/usage`
 - **Context window usage** — current conversation's token usage against the model's context window, when available
 - **Cursor as a second source** — when Cursor is installed and logged in, the header becomes a clickable selector to switch between "Claude Code" and "Cursor"; Cursor's view shows its monthly billing-cycle % and reset date, cost spent vs. plan limit, and a recent-activity list (model, tokens, cost) for your last few requests. If no Cursor session is found, the header looks exactly as it always has — no dropdown, no visual change.
@@ -95,6 +95,21 @@ Click the ⚙ icon in the popup header to open Settings:
 
 Settings persist to disk and survive restarts. Click ⓘ for the About panel; click ← from either view to return to the usage screen.
 
+## Info
+
+The menu-bar percentage always tells you which window it's from — `5h` (five-hour), `Wk` (weekly), or `Mo` (Cursor's monthly billing cycle):
+
+<p>
+  <img src="docs/screenshots/tray-title.png" height="40" alt="Tray icon showing 9% 5h">
+</p>
+
+Right-click the tray icon for the app menu — **Info** jumps straight to the same About panel reachable from ⓘ inside the popup (version, description, contact email), then **Quit**:
+
+<p>
+  <img src="docs/screenshots/tray-menu.png" width="360" alt="Right-click tray menu with Info and Quit token-pulse">
+  <img src="docs/screenshots/about-view.png" width="280" alt="About panel opened from the tray menu's Info item">
+</p>
+
 ## Requirements
 
 - Node.js 22+ and npm, for the dev/build tooling (Vite, Electron, TypeScript)
@@ -109,7 +124,7 @@ npm install
 npm run dev
 ```
 
-This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. A tray/menu-bar icon appears (a colored ring) — click it to open the popup. Right-click the tray icon for the app menu — current version, then Quit; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op, and the app has no Dock icon on macOS).
+This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. A tray/menu-bar icon appears (a colored ring) — click it to open the popup. Right-click the tray icon for the app menu — Info, then Quit; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op, and the app has no Dock icon on macOS).
 
 ### Tests and type-checking
 

@@ -34,12 +34,7 @@ export function getOrCreatePopup(preloadPath: string, source: PopupSource): Brow
   return popup
 }
 
-export function togglePopup(tray: Tray, preloadPath: string, source: PopupSource): void {
-  const win = getOrCreatePopup(preloadPath, source)
-  if (win.isVisible()) {
-    win.hide()
-    return
-  }
+function positionNearTrayAndShow(win: BrowserWindow, tray: Tray): void {
   const trayBounds = tray.getBounds()
   const display = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y })
   const windowBounds = win.getBounds()
@@ -50,6 +45,23 @@ export function togglePopup(tray: Tray, preloadPath: string, source: PopupSource
   win.setPosition(clampedX, clampedY)
   win.show()
   win.focus()
+}
+
+export function togglePopup(tray: Tray, preloadPath: string, source: PopupSource): void {
+  const win = getOrCreatePopup(preloadPath, source)
+  if (win.isVisible()) {
+    win.hide()
+    return
+  }
+  positionNearTrayAndShow(win, tray)
+}
+
+// Unlike togglePopup, always ends with the popup visible — used by menu actions (e.g. "Info")
+// that need to land on a specific view rather than following the usual open/close toggle.
+export function showPopup(tray: Tray, preloadPath: string, source: PopupSource): BrowserWindow {
+  const win = getOrCreatePopup(preloadPath, source)
+  positionNearTrayAndShow(win, tray)
+  return win
 }
 
 export function getPopupIfExists(): BrowserWindow | null {

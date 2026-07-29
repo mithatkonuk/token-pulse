@@ -4,14 +4,14 @@ import { formatTrayTitle, type TrayWindowLabel } from '../src/main/trayTitle'
 
 let tray: Tray | null = null
 
-export function createTray(onClick: (tray: Tray) => void, isDarkMode: boolean): Tray {
+export function createTray(onClick: (tray: Tray) => void, onShowInfo: (tray: Tray) => void, isDarkMode: boolean): Tray {
   tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0, ICON_SIZE, isDarkMode)))
   tray.setToolTip('token-pulse')
   if (process.platform === 'darwin') {
     tray.setTitle(formatTrayTitle(0))
   }
   const menu = Menu.buildFromTemplate([
-    { label: `token-pulse v${app.getVersion()}`, enabled: false },
+    { label: 'Info', click: () => onShowInfo(tray as Tray) },
     { type: 'separator' },
     { label: 'Quit token-pulse', accelerator: 'Cmd+Q', click: () => app.quit() },
   ])

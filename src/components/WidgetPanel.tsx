@@ -46,6 +46,12 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const listener = () => setView('about')
+    window.ipcRenderer.on('popup:show-about', listener)
+    return () => window.ipcRenderer.off('popup:show-about', listener)
+  }, [])
+
   if (!state) {
     return <div ref={panelRef} className="widget-panel">Loading usage…</div>
   }
