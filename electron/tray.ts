@@ -4,16 +4,25 @@ import { formatTrayTitle, type TrayWindowLabel } from '../src/main/trayTitle'
 
 let tray: Tray | null = null
 
-export function createTray(onClick: (tray: Tray) => void, onShowInfo: (tray: Tray) => void, isDarkMode: boolean): Tray {
+export type TrayPanelView = 'settings' | 'about'
+
+export function createTray(
+  onClick: (tray: Tray) => void,
+  onShowView: (tray: Tray, view: TrayPanelView) => void,
+  isDarkMode: boolean
+): Tray {
   tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0, ICON_SIZE, isDarkMode)))
   tray.setToolTip('token-pulse')
   if (process.platform === 'darwin') {
     tray.setTitle(formatTrayTitle(0))
   }
   const menu = Menu.buildFromTemplate([
-    { label: 'Info', click: () => onShowInfo(tray as Tray) },
+    { label: 'Toggle', click: () => onClick(tray as Tray) },
     { type: 'separator' },
-    { label: 'Quit token-pulse', accelerator: 'Cmd+Q', click: () => app.quit() },
+    { label: 'Preferences', click: () => onShowView(tray as Tray, 'settings') },
+    { label: 'Info', click: () => onShowView(tray as Tray, 'about') },
+    { type: 'separator' },
+    { label: 'Quit', accelerator: 'Cmd+Q', click: () => app.quit() },
   ])
   tray.on('click', () => onClick(tray as Tray))
   tray.on('right-click', () => tray?.popUpContextMenu(menu))

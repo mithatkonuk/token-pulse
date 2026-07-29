@@ -4,9 +4,10 @@ import { UsageView } from './UsageView'
 import { SettingsView } from './SettingsView'
 import { AboutView } from './AboutView'
 import { SourceSelector } from './SourceSelector'
-import { BackIcon, SettingsIcon, InfoIcon } from './icons'
+import { BackIcon } from './icons'
 
 type PanelView = 'usage' | 'settings' | 'about'
+const KNOWN_PANEL_VIEWS: PanelView[] = ['usage', 'settings', 'about']
 
 const FONT_FAMILY_STACKS: Record<AppSettings['fontFamily'], string> = {
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -47,9 +48,13 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
   }, [])
 
   useEffect(() => {
-    const listener = () => setView('about')
-    window.ipcRenderer.on('popup:show-about', listener)
-    return () => window.ipcRenderer.off('popup:show-about', listener)
+    const listener = (_event: unknown, view: unknown) => {
+      if (KNOWN_PANEL_VIEWS.includes(view as PanelView)) {
+        setView(view as PanelView)
+      }
+    }
+    window.ipcRenderer.on('popup:show-view', listener)
+    return () => window.ipcRenderer.off('popup:show-view', listener)
   }, [])
 
   if (!state) {
@@ -83,19 +88,10 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
           onSelect={selectSource}
         />
         <div className="widget-panel__header-nav">
-          {view !== 'usage' ? (
+          {view !== 'usage' && (
             <button className="widget-panel__icon-button" onClick={() => setView('usage')} aria-label="Back">
               <BackIcon />
             </button>
-          ) : (
-            <>
-              <button className="widget-panel__icon-button" onClick={() => setView('settings')} aria-label="Settings">
-                <SettingsIcon />
-              </button>
-              <button className="widget-panel__icon-button" onClick={() => setView('about')} aria-label="About">
-                <InfoIcon />
-              </button>
-            </>
           )}
         </div>
       </div>

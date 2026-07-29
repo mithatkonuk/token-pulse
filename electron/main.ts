@@ -263,15 +263,15 @@ app.whenReady().then(() => {
       sources.forEach(poll)
       sources.forEach(refreshUsageFromCommandOnOpen)
     }
-  }, (trayRef) => {
+  }, (trayRef, view) => {
     const win = showPopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
     pushState()
     // On the very first click ever, the popup was just created and its renderer may not have
     // mounted its IPC listener yet — wait for the page load to finish rather than racing it.
     if (win.webContents.isLoading()) {
-      win.webContents.once('did-finish-load', () => win.webContents.send('popup:show-about'))
+      win.webContents.once('did-finish-load', () => win.webContents.send('popup:show-view', view))
     } else {
-      win.webContents.send('popup:show-about')
+      win.webContents.send('popup:show-view', view)
     }
   }, nativeTheme.shouldUseDarkColors)
   nativeTheme.on('updated', pushState)
