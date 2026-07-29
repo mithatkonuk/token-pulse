@@ -54,22 +54,41 @@ beforeEach(() => {
     send: vi.fn(),
     invoke: vi.fn().mockResolvedValue(undefined),
   }
-  ;(window as unknown as { __emit: (channel: string) => void }).__emit = (channel: string) => {
-    listeners.get(channel)?.forEach((listener) => listener(null))
+  ;(window as unknown as { __emit: (channel: string, ...args: unknown[]) => void }).__emit = (
+    channel: string,
+    ...args: unknown[]
+  ) => {
+    listeners.get(channel)?.forEach((listener) => listener(null, ...args))
   }
 })
 
+function emit(channel: string, ...args: unknown[]): void {
+  ;(window as unknown as { __emit: (channel: string, ...args: unknown[]) => void }).__emit(channel, ...args)
+}
+
 describe('WidgetPanel', () => {
-  it('shows the usage view by default', () => {
+  it('shows the usage view by default, with no Settings or Info buttons in the header', () => {
     render(<WidgetPanel state={baseState()} />)
     expect(screen.queryByText('Version 0.2.1')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Settings')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('About')).not.toBeInTheDocument()
   })
 
-  it('switches to the About view when the main process sends popup:show-about', () => {
+  it('switches to the About view when the main process sends popup:show-view("about")', () => {
     render(<WidgetPanel state={baseState()} />)
-    act(() => {
-      ;(window as unknown as { __emit: (channel: string) => void }).__emit('popup:show-about')
-    })
+    act(() => emit('popup:show-view', 'about'))
     expect(screen.getByText('Version 0.2.1')).toBeInTheDocument()
+  })
+
+  it('switches to the Settings view when the main process sends popup:show-view("settings")', () => {
+    render(<WidgetPanel state={baseState()} />)
+    act(() => emit('popup:show-view', 'settings'))
+    expect(screen.getByLabelText('Back')).toBeInTheDocument()
+  })
+
+  it('ignores an unknown view name', () => {
+    render(<WidgetPanel state={baseState()} />)
+    act(() => emit('popup:show-view', 'not-a-real-view'))
+    expect(screen.queryByLabelText('Back')).not.toBeInTheDocument()
   })
 })

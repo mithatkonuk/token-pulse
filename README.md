@@ -77,25 +77,7 @@ The token/cost field mapping for `GetFilteredUsageEvents` was reverse-engineered
 
 If no Cursor token is found, none of this runs — the header shows the exact same plain text it always has, with no dropdown.
 
-## Settings
-
-Click the ⚙ icon in the popup header to open Settings:
-
-<p>
-  <img src="docs/screenshots/settings-dark.png" width="320" alt="Settings view — dark theme">
-  <img src="docs/screenshots/settings-light.png" width="320" alt="Settings view — light theme">
-</p>
-
-| Control | Options |
-|---|---|
-| Theme | Dark / Light / System (follows the OS appearance) |
-| Font family | System / Monospace / Serif / Menlo / JetBrains Mono |
-| Font size | Small / Medium / Large |
-| Start at login | On / Off |
-
-Settings persist to disk and survive restarts. Click ⓘ for the About panel; click ← from either view to return to the usage screen.
-
-## Info
+## Settings and Info
 
 The menu-bar percentage always tells you which window it's from — `5h` (five-hour), `Wk` (weekly), or `Mo` (Cursor's monthly billing cycle):
 
@@ -103,12 +85,26 @@ The menu-bar percentage always tells you which window it's from — `5h` (five-h
   <img src="docs/screenshots/tray-title.png" height="40" alt="Tray icon showing 9% 5h">
 </p>
 
-Right-click the tray icon for the app menu — **Info** jumps straight to the same About panel reachable from ⓘ inside the popup (version, description, contact email), then **Quit**:
+Both Settings and the About panel live behind a right-click, not in the popup header — right-click the tray icon for the app menu: **Toggle** opens/closes the popup, same as a left-click; **Preferences** and **Info** open the popup straight to that view; then **Quit**:
 
 <p>
-  <img src="docs/screenshots/tray-menu.png" width="360" alt="Right-click tray menu with Info and Quit token-pulse">
+  <img src="docs/screenshots/tray-menu.png" width="360" alt="Right-click tray menu with Toggle, Preferences, Info, and Quit">
+</p>
+
+<p>
+  <img src="docs/screenshots/settings-dark.png" width="320" alt="Settings view — dark theme">
+  <img src="docs/screenshots/settings-light.png" width="320" alt="Settings view — light theme">
   <img src="docs/screenshots/about-view.png" width="280" alt="About panel opened from the tray menu's Info item">
 </p>
+
+| Setting | Options |
+|---|---|
+| Theme | Dark / Light / System (follows the OS appearance) |
+| Font family | System / Monospace / Serif / Menlo / JetBrains Mono |
+| Font size | Small / Medium / Large |
+| Start at login | On / Off |
+
+Settings persist to disk and survive restarts. Click ← from either view to return to the usage screen.
 
 ## Requirements
 
@@ -124,7 +120,7 @@ npm install
 npm run dev
 ```
 
-This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. A tray/menu-bar icon appears (a colored ring) — click it to open the popup. Right-click the tray icon for the app menu — Info, then Quit; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op, and the app has no Dock icon on macOS).
+This starts Vite (renderer) and launches Electron with hot-reload for both the popup UI and the main process. A tray/menu-bar icon appears (a colored ring) — click it to open the popup. Right-click the tray icon for the app menu — Toggle, Preferences, Info, then Quit; the app has no other way to exit, since it's designed to live in the background (`window-all-closed` is intentionally a no-op, and the app has no Dock icon on macOS).
 
 ### Tests and type-checking
 
