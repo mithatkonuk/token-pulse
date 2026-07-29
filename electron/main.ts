@@ -106,7 +106,8 @@ let state: AppState = {
 function pushState(): void {
   const activeUsage = state.usageBySource[state.activeSourceId]
   const primaryWindow = activeUsage.windows[0]
-  updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors)
+  const windowLabel = primaryWindow?.id === 'five_hour' || primaryWindow?.id === 'weekly' ? primaryWindow.id : null
+  updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors, windowLabel)
   const popup = getPopupIfExists()
   if (popup && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
