@@ -4,7 +4,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
 import { createTray, updateTrayIcon } from './tray'
-import { togglePopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
+import { trayWindowLabelForWindowId } from '../src/main/trayTitle'
+import { togglePopup, showPopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import { CursorProvider } from '../src/providers/cursor'
@@ -106,7 +107,7 @@ let state: AppState = {
 function pushState(): void {
   const activeUsage = state.usageBySource[state.activeSourceId]
   const primaryWindow = activeUsage.windows[0]
-  const windowLabel = primaryWindow?.id === 'five_hour' || primaryWindow?.id === 'weekly' ? primaryWindow.id : null
+  const windowLabel = trayWindowLabelForWindowId(primaryWindow?.id)
   updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors, windowLabel)
   const popup = getPopupIfExists()
   if (popup && popup.isVisible()) {
@@ -261,6 +262,16 @@ app.whenReady().then(() => {
     } else {
       sources.forEach(poll)
       sources.forEach(refreshUsageFromCommandOnOpen)
+    }
+  }, (trayRef) => {
+    const win = showPopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
+    pushState()
+    // On the very first click ever, the popup was just created and its renderer may not have
+    // mounted its IPC listener yet — wait for the page load to finish rather than racing it.
+    if (win.webContents.isLoading()) {
+      win.webContents.once('did-finish-load', () => win.webContents.send('popup:show-about'))
+    } else {
+      win.webContents.send('popup:show-about')
     }
   }, nativeTheme.shouldUseDarkColors)
   nativeTheme.on('updated', pushState)
