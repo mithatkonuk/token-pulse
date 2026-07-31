@@ -110,7 +110,7 @@ function pushState(): void {
   const windowLabel = trayWindowLabelForWindowId(primaryWindow?.id)
   updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors, windowLabel)
   const popup = getPopupIfExists()
-  if (popup && popup.isVisible()) {
+  if (popup && !popup.isDestroyed() && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
   }
 }

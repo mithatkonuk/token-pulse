@@ -30,7 +30,9 @@ export function createTray(
 }
 
 export function updateTrayIcon(percentUsed: number, isDarkMode: boolean, windowLabel: TrayWindowLabel = null): void {
-  if (!tray) {
+  // A watcher/interval callback can still be in flight when quit tears down the native Tray —
+  // the module-level reference stays non-null, so `isDestroyed()` is the only real guard.
+  if (!tray || tray.isDestroyed()) {
     return
   }
   tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed, ICON_SIZE, isDarkMode)))
