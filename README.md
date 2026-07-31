@@ -2,9 +2,9 @@
 
 # token-pulse
 
-**Your Claude (and Cursor) usage, always one glance away.**
+**Your Claude and Cursor usage, always one glance away.**
 
-A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude 5-hour and weekly rate-limit usage — without ever running `/usage` yourself. If Cursor is installed and logged in, its billing-cycle usage, cost, and recent activity are one click away too.
+A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude usage — 5-hour and weekly rate limits, without ever running `/usage` yourself — and, if Cursor is installed and logged in, its usage too: monthly billing-cycle %, cost, and recent activity. Either source, one glance.
 
 ### 🔒 Nothing to sign into, ever — no accounts, no API keys, no passwords typed in.
 
@@ -57,7 +57,7 @@ token-pulse never asks you to create a credential. It reuses the Anthropic sessi
   <img src="docs/screenshots/claude-with-selector.png" width="320" alt="Claude Code view — header is now a clickable source selector when Cursor is also detected">
 </p>
 
-**Usage bars and the limits breakdown** come from shelling out to `claude -p "/usage" --mcp-config '{"mcpServers":{}}' --strict-mcp-config` — the same slash command you'd run yourself in a terminal, with MCP servers explicitly disabled for that one-off call (this is a background polling call, not an interactive session — it has no use for whatever MCP servers happen to be configured, and loading them anyway was previously an unnecessary side effect, including spinning up unrelated local connections). It's a real subprocess call (~1-2s), and it's the only network-touching part of the app: `/usage` itself is a pure local command (no model/API-turn cost), but it does ask Claude's account-status endpoint for your real percentages. This call happens once at startup, then every 3 minutes while Claude is actively being used — deliberately not tied to popup-open, since each call has real latency and a real side effect (see below), not something worth paying on every UI interaction. If no watched session/cache file has changed for 15 minutes, the cadence backs off to every 20 minutes instead of polling on a fixed timer forever; the moment activity resumes, it snaps back to every 3 minutes on the next check.
+**Usage bars and the limits breakdown** come from shelling out to `claude -p "/usage" --mcp-config '{"mcpServers":{}}' --strict-mcp-config` — the same slash command you'd run yourself in a terminal, with MCP servers explicitly disabled for that one-off call (this is a background polling call, not an interactive session — it has no use for whatever MCP servers happen to be configured, and loading them anyway was previously an unnecessary side effect, including spinning up unrelated local connections). It's a real subprocess call (~1-2s), and it's the only network-touching part of the app: `/usage` itself is a pure local command (no model/API-turn cost), but it does ask Claude's account-status endpoint for your real percentages. This call happens once at startup, then every 3 minutes while Claude is actively being used — deliberately not tied to popup-open, since each call has real latency and a real side effect (see below), not something worth paying on every UI interaction. If no watched session/cache file has changed for 15 minutes, the cadence backs off to every 10 minutes instead of polling on a fixed timer forever; the moment activity resumes, it snaps back to every 3 minutes on the next check.
 
 Every `-p` invocation starts a brand-new session, which writes a transcript file under `~/.claude/projects/<project-hash>/`. token-pulse pins the session ID itself (`--session-id`) and always runs from a dedicated scratch directory (`<userData>/usage-check-cwd`, never a real project), then deletes that exact transcript file right after reading the output — so this doesn't leave any of the usual per-session clutter behind, and it never gets attributed to whatever project you're actually working in.
 
@@ -182,7 +182,7 @@ docs/superpowers/           Design specs and implementation plans this project w
 
 ## Known limitations
 
-- Usage bars are only as fresh as the last successful `/usage` call (every 3 minutes while active, backing off to every 20 minutes after 15 minutes of inactivity) — there's no push/webhook, so between calls the numbers can lag reality by up to that interval.
+- Usage bars are only as fresh as the last successful `/usage` call (every 3 minutes while active, backing off to every 10 minutes after 15 minutes of inactivity) — there's no push/webhook, so between calls the numbers can lag reality by up to that interval.
 - Each `/usage` call is a real subprocess spawn (~1-2s); this is deliberately not run on every popup open or file-watch event, to keep that cost bounded.
 - The model name in the header is labelled **"last active"** for a reason: it's read from whichever session transcript was most recently written to, anywhere on this machine. It's the model that last actually *produced output* — so it won't reflect a model you selected but haven't sent a message on yet, and with several sessions open on different models it shows whichever one replied most recently. There's no `/model`, `/status`, or `/usage` output that reports the active model non-interactively (all three are unavailable or model-free under `claude -p`), and `settings.json`'s `model` field is only a static default, not the live selection. Usage percentages don't depend on any of this.
 - The "This session" cost/lines-changed/per-model breakdown you see in Claude Code's own interactive `/cost` or `/stats` views isn't available here — that data lives only in a live interactive session's in-memory state and can't be retrieved by a separate background process, no matter how it's invoked.
