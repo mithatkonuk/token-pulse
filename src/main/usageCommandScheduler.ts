@@ -2,7 +2,7 @@
 // endpoint — worth polling briskly while Claude is actually being used, but wasteful to
 // keep firing every few minutes when nothing has touched a Claude session in a while.
 export const ACTIVE_INTERVAL_MS = 3 * 60 * 1000
-export const IDLE_INTERVAL_MS = 20 * 60 * 1000
+export const IDLE_INTERVAL_MS = 10 * 60 * 1000
 export const IDLE_THRESHOLD_MS = 15 * 60 * 1000
 // Opening the panel is the one moment the numbers are actually being read, so the scheduled
 // cadence isn't good enough there: the bars would otherwise be up to ACTIVE_INTERVAL_MS old —
