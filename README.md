@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="build/icon.png" width="64" height="64" alt="token-pulse icon">
+
 # token-pulse
 
 **Your Claude and Cursor usage, always one glance away.**
