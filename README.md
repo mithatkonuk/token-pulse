@@ -6,9 +6,9 @@
 
 A lightweight tray/menu-bar widget for macOS, Windows, and Linux that shows your Claude 5-hour and weekly rate-limit usage — without ever running `/usage` yourself. If Cursor is installed and logged in, its billing-cycle usage, cost, and recent activity are one click away too.
 
-### 🔒 No API keys. No Anthropic auth tokens. No Cursor login. Nothing to sign into — ever.
+### 🔒 Nothing to sign into, ever — no accounts, no API keys, no passwords typed in.
 
-token-pulse never asks you for a credential of any kind. It only reads what your existing `claude` CLI session (and, optionally, Cursor's desktop app) already has stored locally — everything runs on your own machine.
+token-pulse never asks you to create a credential. It reuses the Anthropic session your `claude` CLI is already logged into, and — if Cursor's installed — the access token Cursor's own desktop app already saved locally. Nothing is entered here, and nothing leaves your machine except calls made with auth you already had.
 
 ![platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-informational)
 ![node](https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white)
