@@ -109,7 +109,7 @@ Settings persist to disk and survive restarts. Click ← from either view to ret
 - Node.js 22+ and npm, for the dev/build tooling (Vite, Electron, TypeScript)
 - The `claude` CLI installed and on `PATH`, logged in (usage bars run it directly)
 - Nothing else — model name, context window, and plan tier all work out of the box from session transcripts and `~/.claude.json`. A custom statusline script that populates `~/.claude/token-pulse-cache.json` (like the maintainer's own — see "How it gets its numbers" above) is entirely optional and only used as a fallback if a transcript is ever unavailable
-- Cursor is entirely optional — if it's not installed or you're not logged in, the app behaves exactly as it did before Cursor support existed
+- Cursor is entirely optional — if it's not installed, or installed but not logged in, token-pulse just shows Claude usage: no source selector, no Cursor tab, nothing else changes
 
 ## Running a dev instance
 
