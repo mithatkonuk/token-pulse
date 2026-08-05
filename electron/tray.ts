@@ -1,10 +1,19 @@
 import { Tray, nativeImage, Menu, app } from 'electron'
 import { renderUsageRingPng, ICON_SIZE } from '../src/main/trayIcon'
 import { formatTrayTitle, type TrayWindowLabel } from '../src/main/trayTitle'
+import { toggleIconPng, preferencesIconPng, infoIconPng, quitIconPng } from '../src/main/menuIcons'
 
 let tray: Tray | null = null
 
 export type TrayPanelView = 'settings' | 'about'
+
+// Template images: macOS re-tints these automatically (e.g. white when a menu row is
+// highlighted) instead of the fixed black they're drawn in.
+function templateIcon(pngBuffer: Buffer): Electron.NativeImage {
+  const image = nativeImage.createFromBuffer(pngBuffer)
+  image.setTemplateImage(true)
+  return image
+}
 
 export function createTray(
   onClick: (tray: Tray) => void,
@@ -17,12 +26,12 @@ export function createTray(
     tray.setTitle(formatTrayTitle(0))
   }
   const menu = Menu.buildFromTemplate([
-    { label: 'Toggle', click: () => onClick(tray as Tray) },
+    { label: 'Toggle', icon: templateIcon(toggleIconPng()), click: () => onClick(tray as Tray) },
     { type: 'separator' },
-    { label: 'Preferences', click: () => onShowView(tray as Tray, 'settings') },
-    { label: 'Info', click: () => onShowView(tray as Tray, 'about') },
+    { label: 'Preferences', icon: templateIcon(preferencesIconPng()), click: () => onShowView(tray as Tray, 'settings') },
+    { label: 'Info', icon: templateIcon(infoIconPng()), click: () => onShowView(tray as Tray, 'about') },
     { type: 'separator' },
-    { label: 'Quit', accelerator: 'Cmd+Q', click: () => app.quit() },
+    { label: 'Quit', icon: templateIcon(quitIconPng()), accelerator: 'Cmd+Q', click: () => app.quit() },
   ])
   tray.on('click', () => onClick(tray as Tray))
   tray.on('right-click', () => tray?.popUpContextMenu(menu))
