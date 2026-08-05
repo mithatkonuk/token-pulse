@@ -83,7 +83,7 @@ The menu-bar percentage always tells you which window it's from — `5h` (five-h
   <img src="docs/screenshots/tray-title.png" height="40" alt="Tray icon showing 9% 5h">
 </p>
 
-Both Settings and the About panel live behind a right-click, not in the popup header — right-click the tray icon for the app menu: **Toggle** opens/closes the popup, same as a left-click; **Preferences** and **Info** open the popup straight to that view; then **Quit**:
+Both Settings and the About panel live behind a right-click, not in the popup header — right-click the tray icon for the app menu: **Toggle** opens/closes the popup, same as a left-click; **Preferences** and **Info** open the popup straight to that view; then **Quit**. Each item gets a small hand-drawn icon (window / sliders / info circle / power), matching the icon-plus-label style of other menu-bar apps:
 
 <p>
   <img src="docs/screenshots/tray-menu.png" width="360" alt="Right-click tray menu with Toggle, Preferences, Info, and Quit">
