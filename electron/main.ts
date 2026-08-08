@@ -106,7 +106,7 @@ let state: AppState = {
 
 function pushState(): void {
   const activeUsage = state.usageBySource[state.activeSourceId]
-  const primaryWindow = activeUsage.windows[0]
+  const primaryWindow = activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows[0]
   const windowLabel = trayWindowLabelForWindowId(primaryWindow?.id)
   updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors, windowLabel)
   const popup = getPopupIfExists()
