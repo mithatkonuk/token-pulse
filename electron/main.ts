@@ -19,6 +19,7 @@ import {
   ACTIVE_INTERVAL_MS,
 } from '../src/main/usageCommandScheduler'
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
+import { parseResetTimestamp } from '../src/main/resetTimestamp'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -31,6 +32,10 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 // Safety net in case a file watcher misses an event (rare, but fs watching isn't
 // 100% reliable cross-platform) — normal updates are watch-driven, not timed.
 const FALLBACK_POLL_MS = 60 * 1000
+
+// Small margin past the CLI-reported reset instant so the scheduled refresh doesn't land a few
+// hundred ms early and still read the pre-reset window.
+const RESET_REFRESH_BUFFER_MS = 5 * 1000
 
 // Cursor's API is unofficial and undocumented, so it gets a more conservative
 // baseline than Claude's supported CLI command.
@@ -50,6 +55,7 @@ interface SourceRuntime {
   lastRefreshAt: number
   consecutiveFailures: number
   refreshInFlight: boolean
+  resetRefreshTimer: NodeJS.Timeout | null
 }
 
 // Cursor is only registered if a token is actually present, so a machine without Cursor
@@ -65,6 +71,7 @@ const sources: SourceRuntime[] = [
     lastRefreshAt: 0,
     consecutiveFailures: 0,
     refreshInFlight: false,
+    resetRefreshTimer: null,
   },
   ...(cursorAvailable
     ? [
@@ -77,6 +84,7 @@ const sources: SourceRuntime[] = [
           lastRefreshAt: 0,
           consecutiveFailures: 0,
           refreshInFlight: false,
+          resetRefreshTimer: null,
         },
       ]
     : []),
@@ -185,6 +193,39 @@ function refreshUsageFromCommandOnOpen(source: SourceRuntime): void {
   void refreshUsageFromCommand(source)
 }
 
+// The regular active/idle polling cadence (3-10 min) is deliberately relaxed to avoid wasteful
+// subprocess calls, but that means the tray can sit on a stale 5h window for a while right after
+// it actually resets — especially with nobody around to generate the "activity" that keeps the
+// cadence brisk. The CLI already tells us exactly when that window resets, so schedule one precise
+// extra refresh for that instant instead of waiting on the ambient poll.
+function scheduleResetRefresh(source: SourceRuntime, windows: SourceUsage['windows']): void {
+  if (source.resetRefreshTimer) {
+    clearTimeout(source.resetRefreshTimer)
+    source.resetRefreshTimer = null
+  }
+  const fiveHour = windows.find((w) => w.id === 'five_hour')
+  if (!fiveHour) {
+    return
+  }
+  const target = parseResetTimestamp(fiveHour.resetsText)
+  if (!target) {
+    return
+  }
+  const delayMs = target.getTime() - Date.now() + RESET_REFRESH_BUFFER_MS
+  if (delayMs <= 0) {
+    return
+  }
+  source.resetRefreshTimer = setTimeout(() => {
+    source.resetRefreshTimer = null
+    if (source.refreshInFlight) {
+      return
+    }
+    source.lastRefreshAt = Date.now()
+    source.refreshInFlight = true
+    void refreshUsageFromCommand(source)
+  }, delayMs)
+}
+
 async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
   try {
     const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
@@ -209,6 +250,7 @@ async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
       },
     }
     pushState()
+    scheduleResetRefresh(source, result.windows)
   } catch {
     // A provider throwing (e.g. fetch rejecting on a network-level failure — offline, DNS,
     // TLS) must not become an unhandled rejection in the main process; treat it the same as
