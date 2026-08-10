@@ -114,9 +114,16 @@ let state: AppState = {
 
 function pushState(): void {
   const activeUsage = state.usageBySource[state.activeSourceId]
-  const primaryWindow = activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows[0]
-  const windowLabel = trayWindowLabelForWindowId(primaryWindow?.id)
-  updateTrayIcon(primaryWindow?.percentUsed ?? 0, nativeTheme.shouldUseDarkColors, windowLabel)
+  // The tray is a 5h-at-a-glance indicator — weekly (and any other window) is only ever shown
+  // inside the popup panel, never as a tray fallback. If a poll doesn't have a five_hour window
+  // (Claude) this round, leave the tray showing whatever it last displayed rather than swapping
+  // to weekly; non-Claude sources (e.g. Cursor's billing_cycle) still get their own window shown.
+  const primaryWindow =
+    activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows.find((w) => w.id !== 'weekly')
+  if (primaryWindow) {
+    const windowLabel = trayWindowLabelForWindowId(primaryWindow.id)
+    updateTrayIcon(primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel)
+  }
   const popup = getPopupIfExists()
   if (popup && !popup.isDestroyed() && popup.isVisible()) {
     popup.webContents.send('usage:update', state)
