@@ -58,7 +58,11 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
   }, [])
 
   if (!state) {
-    return <div ref={panelRef} className="widget-panel">Loading usage…</div>
+    return (
+      <div ref={panelRef} className="widget-panel" data-vibrancy={window.platform === 'darwin' || undefined}>
+        Loading usage…
+      </div>
+    )
   }
 
   function updateSettings(patch: Partial<AppSettings>): void {
@@ -76,9 +80,16 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
   const activeUsage = state.usageBySource[state.activeSourceId]
   const activeSourceLabel = state.sources.find((s) => s.id === state.activeSourceId)?.label ?? ''
   const dataTheme = state.settings.theme === 'system' ? undefined : state.settings.theme
+  const isVibrant = window.platform === 'darwin'
 
   return (
-    <div ref={panelRef} className="widget-panel" data-theme={dataTheme} style={accentStyle(state.settings)}>
+    <div
+      ref={panelRef}
+      className="widget-panel"
+      data-theme={dataTheme}
+      data-vibrancy={isVibrant || undefined}
+      style={accentStyle(state.settings)}
+    >
       <div className="widget-panel__header">
         <SourceSelector
           sources={state.sources}

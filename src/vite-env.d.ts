@@ -12,4 +12,5 @@ interface Window {
     send(channel: string, ...args: unknown[]): void
     invoke(channel: string, ...args: unknown[]): Promise<unknown>
   }
+  platform: NodeJS.Platform
 }

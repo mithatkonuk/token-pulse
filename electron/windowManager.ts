@@ -14,15 +14,20 @@ export function getOrCreatePopup(preloadPath: string, source: PopupSource): Brow
   if (popup) {
     return popup
   }
+  const isMac = process.platform === 'darwin'
   popup = new BrowserWindow({
     width: POPUP_WIDTH,
     height: 220,
-    backgroundColor: '#1c1c1e',
     show: false,
     frame: false,
     resizable: false,
     fullscreenable: false,
     skipTaskbar: true,
+    // Vibrancy (native NSVisualEffectView blur) is macOS-only; other platforms keep the
+    // previous flat panel since Electron silently ignores these options there anyway.
+    ...(isMac
+      ? { transparent: true, vibrancy: 'popover' as const, visualEffectState: 'active' as const }
+      : { backgroundColor: '#1c1c1e' }),
     webPreferences: { preload: preloadPath },
   })
   if (source.devServerUrl) {
