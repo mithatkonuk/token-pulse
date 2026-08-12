@@ -6,3 +6,4 @@ dist-electron
 release
 .DS_Store
 .claude/
+graphify-out

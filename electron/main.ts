@@ -15,11 +15,15 @@ import type { AppState, AppSettings, SourceUsage } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
 import {
   shouldRefreshUsageCommand,
-  shouldRefreshOnOpen,
+  shouldRefreshImmediately,
   ACTIVE_INTERVAL_MS,
+  NEAR_LIMIT_INTERVAL_MS,
+  IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+  type UsageCommandScheduleConfig,
 } from '../src/main/usageCommandScheduler'
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 import { parseResetTimestamp } from '../src/main/resetTimestamp'
+import { isNearLimit } from '../src/main/nearLimit'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -150,8 +154,15 @@ function poll(source: SourceRuntime): void {
 }
 
 function onWatchedFileActivity(source: SourceRuntime): void {
-  source.lastActivityAt = Date.now()
   poll(source)
+  // A watched file changing means Claude was just actually used — that's a far more direct signal
+  // than "wait for the next 3-minute tick," so check the real usage command now instead of only
+  // refreshing the cheap cached display fields. Floored at NEAR_LIMIT_INTERVAL_MS rather than the
+  // tighter IMMEDIATE_REFRESH_MIN_INTERVAL_MS used for tray-open: file writes happen continuously
+  // during an active session (every streamed turn), so a 15s floor would re-spawn the usage-check
+  // subprocess nearly 4x a minute for the whole session — busier than even the dedicated near-cap
+  // fast path, which defeats the point of that path being the "watching most closely" cadence.
+  refreshUsageFromCommandNow(source, NEAR_LIMIT_INTERVAL_MS)
 }
 
 function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
@@ -164,10 +175,16 @@ function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
   // Once a source is idle, shouldRefreshUsageCommand switches to IDLE_INTERVAL_MS and ignores
   // activeIntervalMs entirely — so a backed-off source must also widen idleIntervalMs, or a
   // persistent failure gets retried every 20 minutes forever instead of respecting the backoff cap.
-  const scheduleConfig =
+  const scheduleConfig: UsageCommandScheduleConfig =
     source.consecutiveFailures > 0
       ? { activeIntervalMs: effectiveActiveIntervalMs, idleIntervalMs: effectiveActiveIntervalMs }
       : { activeIntervalMs: effectiveActiveIntervalMs }
+  // Only honor near-limit while the source is healthy — a failing source is already on its own
+  // backoff cadence via effectiveActiveIntervalMs above, and nearLimit must not override that
+  // (it would turn a capped retry backoff into an unbounded 30s retry storm).
+  if (source.consecutiveFailures === 0 && isNearLimit(state.usageBySource[source.id])) {
+    scheduleConfig.nearLimit = true
+  }
   if (
     shouldRefreshUsageCommand(
       { now, lastActivityAt: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt },
@@ -180,9 +197,20 @@ function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
   }
 }
 
-function refreshUsageFromCommandOnOpen(source: SourceRuntime): void {
-  // Someone looking at the panel is activity, so a source that had gone idle must not stay on
-  // the 20-minute cadence for its next scheduled refresh either.
+// Shared by "the panel was just opened" and "a watched file just changed" — both are a direct
+// signal that someone is actually using the source right now, so both deserve an immediate,
+// real usage-command check rather than waiting on the ambient 3-10 minute cadence, floored by
+// minIntervalMs so a burst of triggers (repeated tray clicks, a flurry of file writes) can't spawn
+// a subprocess per event. Callers pick their own floor: tray-open is a rare, human-triggered event
+// so it gets the tightest floor (IMMEDIATE_REFRESH_MIN_INTERVAL_MS); file activity happens
+// continuously during a session, so it uses a wider one to avoid becoming the busiest cadence in
+// the app (see call site in onWatchedFileActivity).
+function refreshUsageFromCommandNow(
+  source: SourceRuntime,
+  minIntervalMs: number = IMMEDIATE_REFRESH_MIN_INTERVAL_MS
+): void {
+  // This is activity, so a source that had gone idle must not stay on the idle cadence for its
+  // next scheduled refresh either.
   source.lastActivityAt = Date.now()
   if (source.refreshInFlight) {
     return
@@ -191,8 +219,8 @@ function refreshUsageFromCommandOnOpen(source: SourceRuntime): void {
   const floorMs =
     source.consecutiveFailures > 0
       ? computeBackoffIntervalMs(baseActiveIntervalMs, source.consecutiveFailures)
-      : undefined
-  if (!shouldRefreshOnOpen({ now: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt }, floorMs)) {
+      : minIntervalMs
+  if (!shouldRefreshImmediately({ now: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt }, floorMs)) {
     return
   }
   source.lastRefreshAt = source.lastActivityAt
@@ -310,7 +338,7 @@ app.whenReady().then(() => {
       pushState()
     } else {
       sources.forEach(poll)
-      sources.forEach(refreshUsageFromCommandOnOpen)
+      sources.forEach(refreshUsageFromCommandNow)
     }
   }, (trayRef, view) => {
     const win = showPopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })

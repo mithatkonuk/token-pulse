@@ -34,7 +34,7 @@
    behind it — a tinted, translucent fill lets that blur show through instead of covering
    it with a flat color, matching Control Center's frosted-glass panels. */
 .widget-panel[data-vibrancy='true'] {
-  background: color-mix(in srgb, var(--bg-color) 55%, transparent);
+  background: color-mix(in srgb, var(--bg-color) 72%, transparent);
   border: 0.5px solid color-mix(in srgb, var(--text-color) 14%, transparent);
 }
 

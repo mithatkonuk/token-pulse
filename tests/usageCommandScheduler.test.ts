@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   shouldRefreshUsageCommand,
-  shouldRefreshOnOpen,
+  shouldRefreshImmediately,
   ACTIVE_INTERVAL_MS,
   IDLE_INTERVAL_MS,
   IDLE_THRESHOLD_MS,
-  OPEN_REFRESH_MIN_INTERVAL_MS,
+  NEAR_LIMIT_INTERVAL_MS,
+  IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
 } from '../src/main/usageCommandScheduler'
 
 describe('shouldRefreshUsageCommand', () => {
@@ -46,6 +47,42 @@ describe('shouldRefreshUsageCommand', () => {
   })
 })
 
+describe('shouldRefreshUsageCommand near the limit', () => {
+  it('uses the short near-limit cadence even while idle, so a session sitting at the cap is checked briskly', () => {
+    const lastActivityAt = 0
+    const lastRefreshAt = IDLE_THRESHOLD_MS
+    expect(
+      shouldRefreshUsageCommand(
+        { now: lastRefreshAt + NEAR_LIMIT_INTERVAL_MS - 1, lastActivityAt, lastRefreshAt },
+        { nearLimit: true }
+      )
+    ).toBe(false)
+    expect(
+      shouldRefreshUsageCommand(
+        { now: lastRefreshAt + NEAR_LIMIT_INTERVAL_MS, lastActivityAt, lastRefreshAt },
+        { nearLimit: true }
+      )
+    ).toBe(true)
+  })
+
+  it('overrides the active cadence too, so a session sitting at the cap while in active use is still checked briskly', () => {
+    const lastActivityAt = 0
+    const lastRefreshAt = 0
+    expect(
+      shouldRefreshUsageCommand(
+        { now: NEAR_LIMIT_INTERVAL_MS - 1, lastActivityAt, lastRefreshAt },
+        { nearLimit: true }
+      )
+    ).toBe(false)
+    expect(
+      shouldRefreshUsageCommand(
+        { now: NEAR_LIMIT_INTERVAL_MS, lastActivityAt, lastRefreshAt },
+        { nearLimit: true }
+      )
+    ).toBe(true)
+  })
+})
+
 describe('shouldRefreshUsageCommand with a custom config', () => {
   it('uses the overridden active interval instead of the default', () => {
     const lastActivityAt = 0
@@ -72,20 +109,20 @@ describe('shouldRefreshUsageCommand with a custom config', () => {
   })
 })
 
-describe('shouldRefreshOnOpen', () => {
+describe('shouldRefreshImmediately', () => {
   it('refreshes even when the regular active interval has not elapsed yet', () => {
-    const now = OPEN_REFRESH_MIN_INTERVAL_MS
+    const now = IMMEDIATE_REFRESH_MIN_INTERVAL_MS
     expect(shouldRefreshUsageCommand({ now, lastActivityAt: now, lastRefreshAt: 0 })).toBe(false)
-    expect(shouldRefreshOnOpen({ now, lastRefreshAt: 0 })).toBe(true)
+    expect(shouldRefreshImmediately({ now, lastRefreshAt: 0 })).toBe(true)
   })
 
   it('does not refresh when one just finished, so repeated clicks cannot spawn a subprocess each time', () => {
-    expect(shouldRefreshOnOpen({ now: OPEN_REFRESH_MIN_INTERVAL_MS - 1, lastRefreshAt: 0 })).toBe(false)
+    expect(shouldRefreshImmediately({ now: IMMEDIATE_REFRESH_MIN_INTERVAL_MS - 1, lastRefreshAt: 0 })).toBe(false)
   })
 
   it('honours a widened floor so a failing source keeps its backoff', () => {
     const backoffMs = 10 * 60 * 1000
-    expect(shouldRefreshOnOpen({ now: backoffMs - 1, lastRefreshAt: 0 }, backoffMs)).toBe(false)
-    expect(shouldRefreshOnOpen({ now: backoffMs, lastRefreshAt: 0 }, backoffMs)).toBe(true)
+    expect(shouldRefreshImmediately({ now: backoffMs - 1, lastRefreshAt: 0 }, backoffMs)).toBe(false)
+    expect(shouldRefreshImmediately({ now: backoffMs, lastRefreshAt: 0 }, backoffMs)).toBe(true)
   })
 })
