@@ -91,4 +91,18 @@ describe('WidgetPanel', () => {
     act(() => emit('popup:show-view', 'not-a-real-view'))
     expect(screen.queryByLabelText('Back')).not.toBeInTheDocument()
   })
+
+  it('shows the no-source empty state when activeSourceId is null', () => {
+    const state = baseState()
+    state.sources = []
+    state.activeSourceId = null
+    state.usageBySource = {}
+    render(<WidgetPanel state={state} />)
+    expect(screen.getByText(/No supported AI tool found/)).toBeInTheDocument()
+  })
+
+  it('shows the usage view (not the empty state) when a source is active', () => {
+    render(<WidgetPanel state={baseState()} />)
+    expect(screen.queryByText(/No supported AI tool found/)).not.toBeInTheDocument()
+  })
 })
