@@ -22,6 +22,7 @@ export interface ClaudeCodeProviderOptions {
   projectsDir?: string
   runUsageCommandFn?: (cwd: string) => Promise<string | null>
   isAvailableFn?: () => boolean
+  hasLocalDataFn?: () => boolean
 }
 
 export class ClaudeCodeProvider implements UsageProvider {
@@ -30,6 +31,7 @@ export class ClaudeCodeProvider implements UsageProvider {
   private readonly projectsDir: string
   private readonly runUsageCommandFn: (cwd: string) => Promise<string | null>
   private readonly isAvailableFn: () => boolean
+  private readonly hasLocalDataFn: () => boolean
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     const home = os.homedir()
@@ -38,10 +40,12 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.projectsDir = options.projectsDir ?? path.join(home, '.claude', 'projects')
     this.runUsageCommandFn = options.runUsageCommandFn ?? ((cwd) => runUsageCommand(cwd, this.projectsDir))
     this.isAvailableFn = options.isAvailableFn ?? isClaudeCliAvailable
+    this.hasLocalDataFn =
+      options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))
   }
 
   isAvailable(): boolean {
-    return this.isAvailableFn()
+    return this.isAvailableFn() || this.hasLocalDataFn()
   }
 
   getWatchedPaths(): string[] {

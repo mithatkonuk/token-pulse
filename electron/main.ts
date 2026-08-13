@@ -23,6 +23,7 @@ import {
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 import { parseResetTimestamp } from '../src/main/resetTimestamp'
 import { isNearLimit } from '../src/main/nearLimit'
+import { buildAvailableSources, type SourceConfig } from '../src/main/buildSources'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -61,13 +62,6 @@ interface SourceRuntime {
   resetRefreshTimer: NodeJS.Timeout | null
 }
 
-interface SourceConfig {
-  id: string
-  label: string
-  provider: UsageProvider
-  activeIntervalMs?: number
-}
-
 // Both providers are probed for availability the same way — no special-casing either one.
 // A provider not being available (Claude CLI missing, Cursor not installed/logged in) means
 // it's simply never registered, exactly like Cursor already behaved before this change.
@@ -76,19 +70,17 @@ const sourceConfigs: SourceConfig[] = [
   { id: 'cursor', label: 'Cursor', provider: new CursorProvider(), activeIntervalMs: CURSOR_ACTIVE_INTERVAL_MS },
 ]
 
-const sources: SourceRuntime[] = sourceConfigs
-  .filter((config) => config.provider.isAvailable())
-  .map((config) => ({
-    id: config.id,
-    label: config.label,
-    provider: config.provider,
-    activeIntervalMs: config.activeIntervalMs,
-    lastActivityAt: Date.now(),
-    lastRefreshAt: 0,
-    consecutiveFailures: 0,
-    refreshInFlight: false,
-    resetRefreshTimer: null,
-  }))
+const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((config) => ({
+  id: config.id,
+  label: config.label,
+  provider: config.provider,
+  activeIntervalMs: config.activeIntervalMs,
+  lastActivityAt: Date.now(),
+  lastRefreshAt: 0,
+  consecutiveFailures: 0,
+  refreshInFlight: false,
+  resetRefreshTimer: null,
+}))
 
 function emptySourceUsage(): SourceUsage {
   return {
