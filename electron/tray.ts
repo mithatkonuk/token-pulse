@@ -23,7 +23,10 @@ export function createTray(
   tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0, ICON_SIZE, isDarkMode)))
   tray.setToolTip('token-pulse')
   if (process.platform === 'darwin') {
-    tray.setTitle(formatTrayTitle(0))
+    // Placeholder shown before the first real usage-command poll resolves; the tray's
+    // primary metric is always the five-hour window, so label it as such from the start
+    // instead of a bare "0%" that would otherwise sit unlabeled until that first poll lands.
+    tray.setTitle(formatTrayTitle(0, 'five_hour'))
   }
   const menu = Menu.buildFromTemplate([
     { label: 'Toggle', icon: templateIcon(toggleIconPng()), click: () => onClick(tray as Tray) },
