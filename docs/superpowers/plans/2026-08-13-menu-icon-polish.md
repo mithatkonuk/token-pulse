@@ -42,20 +42,24 @@ Create a scratch HTML file (e.g. `/tmp/menu-icon-render.html` or the session scr
 <body>
   <div class="cell" id="toggle">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="4" width="18" height="16" rx="2" stroke="black" stroke-width="1.8"/>
-      <line x1="3" y1="9" x2="21" y2="9" stroke="black" stroke-width="1.8"/>
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="black" stroke-width="2.2"/>
+      <line x1="3" y1="9.5" x2="21" y2="9.5" stroke="black" stroke-width="2.2"/>
     </svg>
   </div>
   <div class="cell" id="preferences">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <line x1="3" y1="6" x2="21" y2="6" stroke="black" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="15" cy="6" r="2.2" fill="black"/>
-      <line x1="3" y1="12" x2="21" y2="12" stroke="black" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="9" cy="12" r="2.2" fill="black"/>
-      <line x1="3" y1="18" x2="21" y2="18" stroke="black" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="17" cy="18" r="2.2" fill="black"/>
+      <line x1="3" y1="5.5" x2="21" y2="5.5" stroke="black" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="15" cy="5.5" r="3" fill="black"/>
+      <line x1="3" y1="12" x2="21" y2="12" stroke="black" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="9" cy="12" r="3" fill="black"/>
+      <line x1="3" y1="18.5" x2="21" y2="18.5" stroke="black" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="17" cy="18.5" r="3" fill="black"/>
     </svg>
   </div>
+  <!-- NOTE (2026-08-13 fix wave): these are the FINAL values, superseding the isolated 1.8-stroke
+       values Task 1 originally produced (which the icon-generation step then thickened to 3.3 to
+       satisfy an alpha===255 test — collapsing these two icons' proportions). See
+       src/main/menuIcons.ts's header comment for the authoritative final SVG source for all 4 icons. -->
   <div class="cell" id="info">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="9.25" stroke="black" stroke-width="1.8"/>

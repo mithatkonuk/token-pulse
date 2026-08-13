@@ -4,7 +4,7 @@ import { MENU_ICON_SIZE, toggleIconPng, preferencesIconPng, infoIconPng, quitIco
 
 function isOpaqueAt(png: PNG, x: number, y: number): boolean {
   const idx = (png.width * y + x) << 2
-  return png.data[idx + 3] === 255
+  return png.data[idx + 3] > 127
 }
 
 describe('menu icons', () => {
@@ -32,11 +32,20 @@ describe('menu icons', () => {
     expect(transparentCount).toBeGreaterThan(0)
   })
 
-  it('draws the toggle icon as a rectangle outline with a filled titlebar strip', () => {
+  it('draws the toggle icon as a window frame with a titlebar divider line', () => {
     const png = PNG.sync.read(toggleIconPng())
     expect(isOpaqueAt(png, 2, 2)).toBe(true) // top-left corner of the frame
-    expect(isOpaqueAt(png, 7, 5)).toBe(true) // titlebar fill (divider row under the titlebar)
-    expect(isOpaqueAt(png, 7, 8)).toBe(false) // interior stays empty
+    expect(isOpaqueAt(png, 7, 6)).toBe(true) // titlebar divider line
+    expect(isOpaqueAt(png, 7, 4)).toBe(false) // transparent gap between the top border and the divider
+  })
+
+  it('draws the preferences icon as three distinct sliders separated by transparent gaps', () => {
+    const png = PNG.sync.read(preferencesIconPng())
+    expect(isOpaqueAt(png, 3, 3)).toBe(true) // top slider bar
+    expect(isOpaqueAt(png, 3, 5)).toBe(false) // gap between the top and middle sliders
+    expect(isOpaqueAt(png, 3, 7)).toBe(true) // middle slider bar
+    expect(isOpaqueAt(png, 3, 9)).toBe(false) // gap between the middle and bottom sliders
+    expect(isOpaqueAt(png, 3, 12)).toBe(true) // bottom slider bar
   })
 
   it('draws the info icon as a ring with a dot-and-stem "i" in the center', () => {
