@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTrayTitle, trayWindowLabelForWindowId } from '../src/main/trayTitle'
+import { formatTrayTitle, trayWindowLabelForWindowId, trayTitleFor } from '../src/main/trayTitle'
 
 describe('formatTrayTitle', () => {
   it('shows just the percentage when no window label is given', () => {
@@ -33,5 +33,19 @@ describe('trayWindowLabelForWindowId', () => {
   it('returns null for an unknown or missing window id', () => {
     expect(trayWindowLabelForWindowId('something_else')).toBeNull()
     expect(trayWindowLabelForWindowId(undefined)).toBeNull()
+  })
+})
+
+describe('trayTitleFor', () => {
+  it('returns an empty string when percentUsed is null (no source available)', () => {
+    expect(trayTitleFor(null)).toBe('')
+  })
+
+  it('delegates to formatTrayTitle when percentUsed is a number', () => {
+    expect(trayTitleFor(63, 'five_hour')).toBe(' 63% 5h')
+  })
+
+  it('delegates to formatTrayTitle with no label when none is given', () => {
+    expect(trayTitleFor(0)).toBe(' 0%')
   })
 })

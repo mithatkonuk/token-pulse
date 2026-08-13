@@ -16,3 +16,7 @@ export function formatTrayTitle(percentUsed: number, windowLabel: TrayWindowLabe
   const suffix = windowLabel ? ` ${WINDOW_LABEL_TEXT[windowLabel]}` : ''
   return ` ${Math.round(percentUsed)}%${suffix}`
 }
+
+export function trayTitleFor(percentUsed: number | null, windowLabel: TrayWindowLabel = null): string {
+  return percentUsed === null ? '' : formatTrayTitle(percentUsed, windowLabel)
+}
