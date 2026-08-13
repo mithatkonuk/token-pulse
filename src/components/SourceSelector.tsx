@@ -10,7 +10,7 @@ export function SourceSelector({
   onSelect,
 }: {
   sources: SourceDescriptor[]
-  activeSourceId: string
+  activeSourceId: string | null
   activeSourceLabel: string
   currentModel: string | null
   onSelect: (id: string) => void

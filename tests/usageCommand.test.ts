@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parseUsageOutput, runUsageCommand } from '../src/providers/claude-code/usageCommand'
+import { parseUsageOutput, runUsageCommand, resolveExecutableOnPath, isClaudeCliAvailable } from '../src/providers/claude-code/usageCommand'
 
 const FULL_OUTPUT = `You are currently using your subscription to power your Claude Code usage
 
@@ -170,5 +170,60 @@ describe('runUsageCommand', () => {
     }) as typeof execFile)
 
     await expect(runUsageCommand('/tmp', projectsDir)).resolves.toBeNull()
+  })
+})
+
+describe('resolveExecutableOnPath', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-path-test-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('finds an executable file in one of the path directories', () => {
+    const binPath = path.join(dir, 'claude')
+    fs.writeFileSync(binPath, '#!/bin/sh\n')
+    fs.chmodSync(binPath, 0o755)
+    const pathString = ['/definitely-not-a-real-dir', dir].join(path.delimiter)
+    expect(resolveExecutableOnPath('claude', pathString)).toBe(binPath)
+  })
+
+  it('returns null when the executable is not found in any directory', () => {
+    const pathString = ['/definitely-not-a-real-dir', dir].join(path.delimiter)
+    expect(resolveExecutableOnPath('claude', pathString)).toBeNull()
+  })
+
+  it('returns null when a matching file exists but is not executable', () => {
+    const binPath = path.join(dir, 'claude')
+    fs.writeFileSync(binPath, '#!/bin/sh\n')
+    fs.chmodSync(binPath, 0o644)
+    expect(resolveExecutableOnPath('claude', dir)).toBeNull()
+  })
+
+  it('skips empty PATH segments', () => {
+    const binPath = path.join(dir, 'claude')
+    fs.writeFileSync(binPath, '#!/bin/sh\n')
+    fs.chmodSync(binPath, 0o755)
+    const pathString = ['', dir, ''].join(path.delimiter)
+    expect(resolveExecutableOnPath('claude', pathString)).toBe(binPath)
+  })
+})
+
+describe('isClaudeCliAvailable', () => {
+  it('returns true when claude is found on the given path', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-claude-cli-test-'))
+    const binPath = path.join(dir, 'claude')
+    fs.writeFileSync(binPath, '#!/bin/sh\n')
+    fs.chmodSync(binPath, 0o755)
+    expect(isClaudeCliAvailable(dir)).toBe(true)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('returns false when claude is not found on the given path', () => {
+    expect(isClaudeCliAvailable('/definitely-not-a-real-dir')).toBe(false)
   })
 })

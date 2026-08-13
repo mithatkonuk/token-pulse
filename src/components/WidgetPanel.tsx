@@ -4,6 +4,7 @@ import { UsageView } from './UsageView'
 import { SettingsView } from './SettingsView'
 import { AboutView } from './AboutView'
 import { SourceSelector } from './SourceSelector'
+import { NoSourceAvailable } from './NoSourceAvailable'
 import { BackIcon } from './icons'
 
 type PanelView = 'usage' | 'settings' | 'about'
@@ -77,8 +78,10 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
       .catch((err: unknown) => console.error('Failed to select source', err))
   }
 
-  const activeUsage = state.usageBySource[state.activeSourceId]
-  const activeSourceLabel = state.sources.find((s) => s.id === state.activeSourceId)?.label ?? ''
+  const activeUsage = state.activeSourceId ? state.usageBySource[state.activeSourceId] : undefined
+  const activeSourceLabel = state.activeSourceId
+    ? (state.sources.find((s) => s.id === state.activeSourceId)?.label ?? '')
+    : ''
   const dataTheme = state.settings.theme === 'system' ? undefined : state.settings.theme
   const isVibrant = window.platform === 'darwin'
 
@@ -95,7 +98,7 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
           sources={state.sources}
           activeSourceId={state.activeSourceId}
           activeSourceLabel={activeSourceLabel}
-          currentModel={activeUsage.currentModel}
+          currentModel={activeUsage?.currentModel ?? null}
           onSelect={selectSource}
         />
         <div className="widget-panel__header-nav">
@@ -106,7 +109,7 @@ export function WidgetPanel({ state }: { state: AppState | null }) {
           )}
         </div>
       </div>
-      {view === 'usage' && <UsageView state={activeUsage} />}
+      {view === 'usage' && (activeUsage ? <UsageView state={activeUsage} /> : <NoSourceAvailable />)}
       {view === 'settings' && <SettingsView settings={state.settings} onUpdate={updateSettings} />}
       {view === 'about' && <AboutView appVersion={state.appVersion} />}
     </div>

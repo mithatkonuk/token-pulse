@@ -70,7 +70,7 @@ export interface SourceDescriptor {
 
 export interface AppState {
   sources: SourceDescriptor[]
-  activeSourceId: string
+  activeSourceId: string | null
   usageBySource: Record<string, SourceUsage>
   settings: AppSettings
   appVersion: string

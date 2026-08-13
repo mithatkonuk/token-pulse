@@ -5,7 +5,7 @@ import type { ContextWindow } from '../../shared/types'
 import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
 import { getContextWindowSizeForModel } from './modelContextWindows'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from './transcript'
-import { parseUsageOutput, runUsageCommand } from './usageCommand'
+import { parseUsageOutput, runUsageCommand, isClaudeCliAvailable } from './usageCommand'
 
 interface StatuslineCache {
   model_display_name?: unknown
@@ -21,6 +21,8 @@ export interface ClaudeCodeProviderOptions {
   statuslineCachePath?: string
   projectsDir?: string
   runUsageCommandFn?: (cwd: string) => Promise<string | null>
+  isAvailableFn?: () => boolean
+  hasLocalDataFn?: () => boolean
 }
 
 export class ClaudeCodeProvider implements UsageProvider {
@@ -28,6 +30,8 @@ export class ClaudeCodeProvider implements UsageProvider {
   private readonly statuslineCachePath: string
   private readonly projectsDir: string
   private readonly runUsageCommandFn: (cwd: string) => Promise<string | null>
+  private readonly isAvailableFn: () => boolean
+  private readonly hasLocalDataFn: () => boolean
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     const home = os.homedir()
@@ -35,6 +39,13 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.statuslineCachePath = options.statuslineCachePath ?? path.join(home, '.claude', 'token-pulse-cache.json')
     this.projectsDir = options.projectsDir ?? path.join(home, '.claude', 'projects')
     this.runUsageCommandFn = options.runUsageCommandFn ?? ((cwd) => runUsageCommand(cwd, this.projectsDir))
+    this.isAvailableFn = options.isAvailableFn ?? isClaudeCliAvailable
+    this.hasLocalDataFn =
+      options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))
+  }
+
+  isAvailable(): boolean {
+    return this.isAvailableFn() || this.hasLocalDataFn()
   }
 
   getWatchedPaths(): string[] {

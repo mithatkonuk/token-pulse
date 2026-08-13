@@ -121,4 +121,12 @@ describe('SourceSelector', () => {
     fireEvent.mouseDown(screen.getByTestId('outside'))
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
+
+  it('renders the plain-text empty state when there are no sources at all', () => {
+    render(
+      <SourceSelector sources={[]} activeSourceId={null} activeSourceLabel="" currentModel={null} onSelect={() => {}} />
+    )
+    expect(screen.getByText('No recent activity')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
 })

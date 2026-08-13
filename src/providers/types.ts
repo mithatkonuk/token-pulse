@@ -14,6 +14,7 @@ export interface CommandUsageResult {
 }
 
 export interface UsageProvider {
+  isAvailable(): boolean
   getWatchedPaths(): string[]
   getPlanTier(): string | null
   getCachedUsage(): CachedUsage

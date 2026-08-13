@@ -17,6 +17,26 @@ function buildAugmentedPath(): string {
   return [...extraDirs, process.env.PATH ?? ''].filter(Boolean).join(path.delimiter)
 }
 
+export function resolveExecutableOnPath(name: string, pathString: string): string | null {
+  for (const dir of pathString.split(path.delimiter)) {
+    if (!dir) {
+      continue
+    }
+    const candidate = path.join(dir, name)
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK)
+      return candidate
+    } catch {
+      // Not here — keep looking.
+    }
+  }
+  return null
+}
+
+export function isClaudeCliAvailable(pathString: string = buildAugmentedPath()): boolean {
+  return resolveExecutableOnPath('claude', pathString) !== null
+}
+
 export interface UsageWindowResult {
   percentUsed: number
   resetsText: string

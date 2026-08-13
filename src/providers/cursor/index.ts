@@ -40,6 +40,10 @@ export class CursorProvider implements UsageProvider {
     this.fetchFilteredUsageEventsFn = options.fetchFilteredUsageEventsFn ?? ((token) => fetchFilteredUsageEvents(token))
   }
 
+  isAvailable(): boolean {
+    return this.readAccessTokenFn() !== null
+  }
+
   getWatchedPaths(): string[] {
     return [this.chatsDir]
   }

@@ -92,3 +92,15 @@ describe('CursorProvider', () => {
     expect(provider.getCachedUsage()).toEqual({ currentModel: null, contextWindow: null })
   })
 })
+
+describe('CursorProvider.isAvailable', () => {
+  it('returns true when an access token is present', () => {
+    const provider = new CursorProvider({ readAccessTokenFn: () => 'fake-token' })
+    expect(provider.isAvailable()).toBe(true)
+  })
+
+  it('returns false when there is no access token', () => {
+    const provider = new CursorProvider({ readAccessTokenFn: () => null })
+    expect(provider.isAvailable()).toBe(false)
+  })
+})

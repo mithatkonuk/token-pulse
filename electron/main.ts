@@ -9,7 +9,6 @@ import { togglePopup, showPopup, getPopupIfExists, POPUP_WIDTH } from './windowM
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import { CursorProvider } from '../src/providers/cursor'
-import { readCursorAccessToken } from '../src/providers/cursor/cursorAuth'
 import type { UsageProvider } from '../src/providers/types'
 import type { AppState, AppSettings, SourceUsage } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
@@ -24,6 +23,7 @@ import {
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 import { parseResetTimestamp } from '../src/main/resetTimestamp'
 import { isNearLimit } from '../src/main/nearLimit'
+import { buildAvailableSources, type SourceConfig } from '../src/main/buildSources'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -62,37 +62,25 @@ interface SourceRuntime {
   resetRefreshTimer: NodeJS.Timeout | null
 }
 
-// Cursor is only registered if a token is actually present, so a machine without Cursor
-// installed/logged in still shows the single-source (no dropdown) experience unchanged.
-const cursorAvailable = readCursorAccessToken() !== null
-
-const sources: SourceRuntime[] = [
-  {
-    id: 'claude',
-    label: 'Claude Code',
-    provider: new ClaudeCodeProvider(),
-    lastActivityAt: Date.now(),
-    lastRefreshAt: 0,
-    consecutiveFailures: 0,
-    refreshInFlight: false,
-    resetRefreshTimer: null,
-  },
-  ...(cursorAvailable
-    ? [
-        {
-          id: 'cursor',
-          label: 'Cursor',
-          provider: new CursorProvider(),
-          activeIntervalMs: CURSOR_ACTIVE_INTERVAL_MS,
-          lastActivityAt: Date.now(),
-          lastRefreshAt: 0,
-          consecutiveFailures: 0,
-          refreshInFlight: false,
-          resetRefreshTimer: null,
-        },
-      ]
-    : []),
+// Both providers are probed for availability the same way — no special-casing either one.
+// A provider not being available (Claude CLI missing, Cursor not installed/logged in) means
+// it's simply never registered, exactly like Cursor already behaved before this change.
+const sourceConfigs: SourceConfig[] = [
+  { id: 'claude', label: 'Claude Code', provider: new ClaudeCodeProvider() },
+  { id: 'cursor', label: 'Cursor', provider: new CursorProvider(), activeIntervalMs: CURSOR_ACTIVE_INTERVAL_MS },
 ]
+
+const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((config) => ({
+  id: config.id,
+  label: config.label,
+  provider: config.provider,
+  activeIntervalMs: config.activeIntervalMs,
+  lastActivityAt: Date.now(),
+  lastRefreshAt: 0,
+  consecutiveFailures: 0,
+  refreshInFlight: false,
+  resetRefreshTimer: null,
+}))
 
 function emptySourceUsage(): SourceUsage {
   return {
@@ -110,23 +98,29 @@ function emptySourceUsage(): SourceUsage {
 
 let state: AppState = {
   sources: sources.map((s) => ({ id: s.id, label: s.label })),
-  activeSourceId: 'claude',
+  activeSourceId: sources[0]?.id ?? null,
   usageBySource: Object.fromEntries(sources.map((s) => [s.id, emptySourceUsage()])),
   settings: readSettings(SETTINGS_PATH),
   appVersion: app.getVersion(),
 }
 
 function pushState(): void {
-  const activeUsage = state.usageBySource[state.activeSourceId]
-  // The tray is a 5h-at-a-glance indicator — weekly (and any other window) is only ever shown
-  // inside the popup panel, never as a tray fallback. If a poll doesn't have a five_hour window
-  // (Claude) this round, leave the tray showing whatever it last displayed rather than swapping
-  // to weekly; non-Claude sources (e.g. Cursor's billing_cycle) still get their own window shown.
-  const primaryWindow =
-    activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows.find((w) => w.id !== 'weekly')
-  if (primaryWindow) {
-    const windowLabel = trayWindowLabelForWindowId(primaryWindow.id)
-    updateTrayIcon(primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel)
+  if (state.activeSourceId === null) {
+    // No provider was available at startup — show the neutral no-source tray state rather
+    // than leaving whatever the tray happened to be showing before.
+    updateTrayIcon(null, nativeTheme.shouldUseDarkColors)
+  } else {
+    const activeUsage = state.usageBySource[state.activeSourceId]
+    // The tray is a 5h-at-a-glance indicator — weekly (and any other window) is only ever shown
+    // inside the popup panel, never as a tray fallback. If a poll doesn't have a five_hour window
+    // (Claude) this round, leave the tray showing whatever it last displayed rather than swapping
+    // to weekly; non-Claude sources (e.g. Cursor's billing_cycle) still get their own window shown.
+    const primaryWindow =
+      activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows.find((w) => w.id !== 'weekly')
+    if (primaryWindow) {
+      const windowLabel = trayWindowLabelForWindowId(primaryWindow.id)
+      updateTrayIcon(primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel)
+    }
   }
   const popup = getPopupIfExists()
   if (popup && !popup.isDestroyed() && popup.isVisible()) {
@@ -350,7 +344,7 @@ app.whenReady().then(() => {
     } else {
       win.webContents.send('popup:show-view', view)
     }
-  }, nativeTheme.shouldUseDarkColors)
+  }, nativeTheme.shouldUseDarkColors, sources.length > 0)
   nativeTheme.on('updated', pushState)
   sources.forEach(poll)
   const now = Date.now()
