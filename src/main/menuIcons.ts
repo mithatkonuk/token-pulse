@@ -1,110 +1,26 @@
-import { PNG } from 'pngjs'
-
 export const MENU_ICON_SIZE = 16
 
-const BLACK: [number, number, number, number] = [0, 0, 0, 255]
+const TOGGLE_ICON_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAu0lEQVR4AdyTvQ3CQAyFLfpsxAgwAT2UUDEHtPQU1LABzEDPDFmA79mcFKWxUbpEfs93p88vP1IWNvEaBqzI2hclFtSsBZzY3ZF6RY31gI5B3ZlmL6wiMNNMpydQgA6kD/ZOJAbEywN89bMNfZtIDEiUniBW4VfaJZEYkKhxwJHjXSIxIFHjgDj9w2cS0A9e+cb6mUgMiFevb6CAs2/NlvSKwEwzHqDNAVsj9Yoa6/8Cc14PXKkViQU3+wIAAP//WQf71gAAAAZJREFUAwArQ0ghx0SlmwAAAABJRU5ErkJggg=='
+const PREFERENCES_ICON_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABE0lEQVR4AbySLUsEURSGR7HJCloNYlSLdqtJsIjV3+BP0GYUbDajoMlotWtRi2Cyqriwdfd5hnPuLguz7Afscp457z1fe+/cWaxm/M1lwAabvA3UyL7lDl4I/TTwSfw0UGedPZUDWiR3YbWBJeJp6qyzp+WANtltOGjgkniaOuvsaTvA5AeP92AFfxWor9HrgTrr7KmPQK7q8vgOHvA7gTrjw96eMoD66SyPsEB7bvMY/RaoM67fJK4Xe8oOtkj4UuQffRaoje2zfoYvuAFj9tQDvEZfzBOJJu7I+e+46pCHdfaUa3wl+DuCDrlB+2NhT7nGPQJrI1gmdwGPcAJ+TPbUR2A9lp1TdQT3UCxvoQQmFT0AAAD//3TLbqMAAAAGSURBVAMAmcFIIZKO7GQAAAAASUVORK5CYII='
+const INFO_ICON_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABRElEQVR4AZySoU5DURBEbzAoQBWB4D9AgiBBoBFgESgS0BDQkKAQWBAEicCBhI/gD6gCUd1zNruvTdO0SZud3Xkzu/tub7vUZn962IIyPaYt2KL1CfyB34RcTQ9pFJMLLrG+wBFYBRVyNT17Sm/jCzSu0/mkHoLNhFyNx2aPvfJugUfTULwj7YJX8JOQq+khxRJnugWnqsC3XFCNFdJyQg5tevbIY6a+woEKeAQV/5D7hBwaUT0x4wJ/Ji9J10uyig3SWUIOjageZ3ouCHXR5II+w3XEbfi8qB5n+i5w4M0ETsC8qJ6YqQUPObVDvQXGwJQormePcszUgm+UK2Cckz7AHthPyNX0kJq9znT/A8Ubkgal+ZYXyHtCrsZjDNsrb3WCeCBpeEnPcC+JEiFX07MnRNPkAjWPdgxZA+sJuZoe0iiGAAAA//+EEPD+AAAABklEQVQDAPhEPEsQ3pHdAAAAAElFTkSuQmCC'
+const QUIT_ICON_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA8UlEQVR4AXyS4REBMRSEQxmaQRO0wi/8oReKQDNmFGHGfrnbiLu8u3l7edndbJJjnqafveSdENZUwEKrzsJFoNcwrqmAsbvBDANW8hyFqEZ6HcDCu1YuhagOEgBetSk5AAIB8skrwKnn8XKaEtDzCQNhng/HhwigIRFSAvIENsCn4tmkTH0FE/XuL5FbYSO8hWE1r5DJynlVfxPC8gn+7hW6O8Gb5DUO8L0QQWdtv/298q/lANIAS/gvtELg0PDgzd/LAZA+BT1GgAnQA0LQi7cOIHUm1SJmjgvoJSV7GBNPHcAcsONaDUEAMyMckPSrLwAAAP//0TPP7gAAAAZJREFUAwBxkyngfvjXrQAAAABJRU5ErkJggg=='
 
-function blankCanvas(): PNG {
-  return new PNG({ width: MENU_ICON_SIZE, height: MENU_ICON_SIZE })
+export function toggleIconPng(): Buffer {
+  return Buffer.from(TOGGLE_ICON_BASE64, 'base64')
 }
 
-function fillPixel(png: PNG, x: number, y: number): void {
-  if (x < 0 || x >= MENU_ICON_SIZE || y < 0 || y >= MENU_ICON_SIZE) {
-    return
-  }
-  const idx = (MENU_ICON_SIZE * y + x) << 2
-  png.data[idx] = BLACK[0]
-  png.data[idx + 1] = BLACK[1]
-  png.data[idx + 2] = BLACK[2]
-  png.data[idx + 3] = BLACK[3]
-}
-
-function fillRect(png: PNG, x0: number, y0: number, x1: number, y1: number): void {
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      fillPixel(png, x, y)
-    }
-  }
-}
-
-function strokeRect(png: PNG, x0: number, y0: number, x1: number, y1: number): void {
-  for (let x = x0; x <= x1; x++) {
-    fillPixel(png, x, y0)
-    fillPixel(png, x, y1)
-  }
-  for (let y = y0; y <= y1; y++) {
-    fillPixel(png, x0, y)
-    fillPixel(png, x1, y)
-  }
-}
-
-// Ring of pixels between innerRadius and outerRadius, optionally skipping a wedge (in degrees,
-// measured clockwise from the top) — used by the power icon to leave a gap for its tick mark.
-function strokeCircle(
-  png: PNG,
-  cx: number,
-  cy: number,
-  outerRadius: number,
-  innerRadius: number,
-  gap?: { fromDeg: number; toDeg: number }
-): void {
-  for (let y = 0; y < MENU_ICON_SIZE; y++) {
-    for (let x = 0; x < MENU_ICON_SIZE; x++) {
-      const dx = x - cx
-      const dy = y - cy
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist > outerRadius || dist < innerRadius) {
-        continue
-      }
-      if (gap) {
-        let angle = (Math.atan2(dx, -dy) * 180) / Math.PI
-        if (angle < 0) {
-          angle += 360
-        }
-        // fromDeg > toDeg means the gap wraps through 0° (e.g. 340°..20°, spanning the top).
-        const inGap = gap.fromDeg <= gap.toDeg ? angle >= gap.fromDeg && angle <= gap.toDeg : angle >= gap.fromDeg || angle <= gap.toDeg
-        if (inGap) {
-          continue
-        }
-      }
-      fillPixel(png, x, y)
-    }
-  }
-}
-
-// Three sliders, à la a classic "settings" glyph — deliberately not a literal gear, which
-// doesn't read as anything recognizable at 16px when hand-drawn from rectangles.
 export function preferencesIconPng(): Buffer {
-  const png = blankCanvas()
-  fillRect(png, 2, 3, 13, 3)
-  fillRect(png, 2, 8, 13, 8)
-  fillRect(png, 2, 13, 13, 13)
-  fillRect(png, 9, 1, 11, 5)
-  fillRect(png, 4, 6, 6, 10)
-  fillRect(png, 10, 11, 12, 15)
-  return PNG.sync.write(png)
+  return Buffer.from(PREFERENCES_ICON_BASE64, 'base64')
 }
 
 export function infoIconPng(): Buffer {
-  const png = blankCanvas()
-  strokeCircle(png, 7.5, 7.5, 7, 5.5)
-  fillRect(png, 7, 3, 8, 4)
-  fillRect(png, 7, 6, 8, 11)
-  return PNG.sync.write(png)
+  return Buffer.from(INFO_ICON_BASE64, 'base64')
 }
 
-// A window with a filled titlebar — represents opening/closing the popup.
-export function toggleIconPng(): Buffer {
-  const png = blankCanvas()
-  strokeRect(png, 2, 3, 13, 12)
-  fillRect(png, 3, 4, 12, 5)
-  return PNG.sync.write(png)
-}
-
-// Standard power symbol: a broken ring with a tick through the gap.
 export function quitIconPng(): Buffer {
-  const png = blankCanvas()
-  strokeCircle(png, 7.5, 8.5, 6, 4.5, { fromDeg: 340, toDeg: 20 })
-  fillRect(png, 7, 2, 8, 8)
-  return PNG.sync.write(png)
+  return Buffer.from(QUIT_ICON_BASE64, 'base64')
 }

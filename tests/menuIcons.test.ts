@@ -34,14 +34,14 @@ describe('menu icons', () => {
 
   it('draws the toggle icon as a rectangle outline with a filled titlebar strip', () => {
     const png = PNG.sync.read(toggleIconPng())
-    expect(isOpaqueAt(png, 2, 3)).toBe(true) // top-left corner of the frame
-    expect(isOpaqueAt(png, 7, 4)).toBe(true) // titlebar fill
+    expect(isOpaqueAt(png, 2, 2)).toBe(true) // top-left corner of the frame
+    expect(isOpaqueAt(png, 7, 5)).toBe(true) // titlebar fill (divider row under the titlebar)
     expect(isOpaqueAt(png, 7, 8)).toBe(false) // interior stays empty
   })
 
   it('draws the info icon as a ring with a dot-and-stem "i" in the center', () => {
     const png = PNG.sync.read(infoIconPng())
-    expect(isOpaqueAt(png, 7, 3)).toBe(true) // the dot of the "i"
+    expect(isOpaqueAt(png, 7, 5)).toBe(true) // the dot of the "i"
     expect(isOpaqueAt(png, 7, 8)).toBe(true) // the stem
     expect(isOpaqueAt(png, 1, 1)).toBe(false) // corner, outside the ring
   })
