@@ -214,24 +214,16 @@ describe('resolveExecutableOnPath', () => {
 })
 
 describe('isClaudeCliAvailable', () => {
-  const originalPath = process.env.PATH
-
-  afterEach(() => {
-    process.env.PATH = originalPath
-  })
-
-  it('returns true when claude is found on PATH', () => {
+  it('returns true when claude is found on the given path', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-claude-cli-test-'))
     const binPath = path.join(dir, 'claude')
     fs.writeFileSync(binPath, '#!/bin/sh\n')
     fs.chmodSync(binPath, 0o755)
-    process.env.PATH = dir
-    expect(isClaudeCliAvailable()).toBe(true)
+    expect(isClaudeCliAvailable(dir)).toBe(true)
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
-  it('returns false when claude is not found anywhere on PATH', () => {
-    process.env.PATH = '/definitely-not-a-real-dir'
-    expect(isClaudeCliAvailable()).toBe(false)
+  it('returns false when claude is not found on the given path', () => {
+    expect(isClaudeCliAvailable('/definitely-not-a-real-dir')).toBe(false)
   })
 })

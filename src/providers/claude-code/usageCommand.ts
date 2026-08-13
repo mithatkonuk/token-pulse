@@ -33,8 +33,8 @@ export function resolveExecutableOnPath(name: string, pathString: string): strin
   return null
 }
 
-export function isClaudeCliAvailable(): boolean {
-  return resolveExecutableOnPath('claude', buildAugmentedPath()) !== null
+export function isClaudeCliAvailable(pathString: string = buildAugmentedPath()): boolean {
+  return resolveExecutableOnPath('claude', pathString) !== null
 }
 
 export interface UsageWindowResult {
