@@ -1,6 +1,6 @@
 import { Tray, nativeImage, Menu, app } from 'electron'
 import { renderUsageRingPng, ICON_SIZE } from '../src/main/trayIcon'
-import { formatTrayTitle, type TrayWindowLabel } from '../src/main/trayTitle'
+import { trayTitleFor, type TrayWindowLabel } from '../src/main/trayTitle'
 import { toggleIconPng, preferencesIconPng, infoIconPng, quitIconPng } from '../src/main/menuIcons'
 
 let tray: Tray | null = null
@@ -18,16 +18,16 @@ function templateIcon(pngBuffer: Buffer): Electron.NativeImage {
 export function createTray(
   onClick: (tray: Tray) => void,
   onShowView: (tray: Tray, view: TrayPanelView) => void,
-  isDarkMode: boolean
+  isDarkMode: boolean,
+  hasAvailableSource: boolean
 ): Tray {
   tray = new Tray(nativeImage.createFromBuffer(renderUsageRingPng(0, ICON_SIZE, isDarkMode)))
   tray.setToolTip('token-pulse')
-  if (process.platform === 'darwin') {
-    // Placeholder shown before the first real usage-command poll resolves; the tray's
-    // primary metric is always the five-hour window, so label it as such from the start
-    // instead of a bare "0%" that would otherwise sit unlabeled until that first poll lands.
-    tray.setTitle(formatTrayTitle(0, 'five_hour'))
-  }
+  // Placeholder shown before the first real usage-command poll resolves. When at least one
+  // source is registered, the tray's primary metric is always the five-hour window, so label
+  // it as such from the start; when no source is available at all, leave the title blank
+  // instead of showing a misleading 0%.
+  updateTrayIcon(hasAvailableSource ? 0 : null, isDarkMode, hasAvailableSource ? 'five_hour' : null)
   const menu = Menu.buildFromTemplate([
     { label: 'Toggle', icon: templateIcon(toggleIconPng()), click: () => onClick(tray as Tray) },
     { type: 'separator' },
@@ -41,15 +41,15 @@ export function createTray(
   return tray
 }
 
-export function updateTrayIcon(percentUsed: number, isDarkMode: boolean, windowLabel: TrayWindowLabel = null): void {
+export function updateTrayIcon(percentUsed: number | null, isDarkMode: boolean, windowLabel: TrayWindowLabel = null): void {
   // A watcher/interval callback can still be in flight when quit tears down the native Tray —
   // the module-level reference stays non-null, so `isDestroyed()` is the only real guard.
   if (!tray || tray.isDestroyed()) {
     return
   }
-  tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed, ICON_SIZE, isDarkMode)))
+  tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed ?? 0, ICON_SIZE, isDarkMode)))
   if (process.platform === 'darwin') {
-    tray.setTitle(formatTrayTitle(percentUsed, windowLabel))
+    tray.setTitle(trayTitleFor(percentUsed, windowLabel))
   }
 }
 
