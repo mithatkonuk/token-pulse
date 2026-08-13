@@ -17,16 +17,16 @@ function usageWithWindows(windows: SourceUsage['windows']): SourceUsage {
 }
 
 describe('isNearLimit', () => {
-  it('is true once the five_hour window is at or above the threshold', () => {
+  it('is true once the five_hour window is at or above the default (orange) threshold', () => {
     const usage = usageWithWindows([
-      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 90, resetsText: null },
+      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 80, resetsText: null },
     ])
     expect(isNearLimit(usage)).toBe(true)
   })
 
-  it('is false when the five_hour window is below the threshold', () => {
+  it('is false when the five_hour window is below the default threshold', () => {
     const usage = usageWithWindows([
-      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 89, resetsText: null },
+      { id: 'five_hour', label: 'Every 5 hours', percentUsed: 79, resetsText: null },
     ])
     expect(isNearLimit(usage)).toBe(false)
   })
