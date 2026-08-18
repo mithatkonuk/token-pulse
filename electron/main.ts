@@ -298,6 +298,13 @@ ipcMain.handle('source:select', (_event, sourceId: string) => {
   }
   state = { ...state, activeSourceId: sourceId }
   pushState()
+  // Switching sources is a human-triggered signal just like opening the tray popup — without
+  // this, a source that hasn't polled recently keeps its stale (possibly empty) `windows`, so
+  // pushState's tray-icon update silently no-ops and the tray keeps showing the previous source.
+  const selected = sources.find((s) => s.id === sourceId)
+  if (selected) {
+    refreshUsageFromCommandNow(selected)
+  }
 })
 
 ipcMain.handle('settings:update', (_event, patch: Partial<AppSettings>) => {
