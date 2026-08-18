@@ -1,6 +1,6 @@
 {
   "name": "token-pulse",
-  "description": "Shows your Claude usage limits from the menu bar.",
+  "description": "Shows your Claude and Cursor usage limits from the menu bar.",
   "private": true,
   "version": "0.1.0",
   "author": {
