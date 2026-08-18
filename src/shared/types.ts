@@ -47,7 +47,7 @@ export interface AppSettings {
   startAtLogin: boolean
   theme: 'dark' | 'light' | 'system'
   accentColor: string
-  fontFamily: 'system' | 'monospace' | 'serif' | 'menlo' | 'jetbrains-mono'
+  fontFamily: 'system' | 'roboto' | 'open-sans'
   fontSize: 'small' | 'medium' | 'large'
 }
 

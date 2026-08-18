@@ -31,7 +31,7 @@ describe('settingsStore', () => {
       startAtLogin: true,
       theme: 'light',
       accentColor: '#ff0000',
-      fontFamily: 'monospace',
+      fontFamily: 'roboto',
       fontSize: 'large',
     }
     writeSettings(filePath, custom)

@@ -2,10 +2,8 @@ import type { AppSettings } from '../shared/types'
 
 const FONT_FAMILIES: Array<{ value: AppSettings['fontFamily']; label: string }> = [
   { value: 'system', label: 'System' },
-  { value: 'monospace', label: 'Monospace' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'menlo', label: 'Menlo' },
-  { value: 'jetbrains-mono', label: 'JetBrains Mono' },
+  { value: 'roboto', label: 'Roboto' },
+  { value: 'open-sans', label: 'Open Sans' },
 ]
 
 const FONT_SIZES: Array<{ value: AppSettings['fontSize']; label: string }> = [

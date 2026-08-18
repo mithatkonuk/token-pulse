@@ -12,10 +12,8 @@ const KNOWN_PANEL_VIEWS: PanelView[] = ['usage', 'settings', 'about']
 
 const FONT_FAMILY_STACKS: Record<AppSettings['fontFamily'], string> = {
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  monospace: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-  serif: "Georgia, 'Times New Roman', serif",
-  menlo: 'Menlo, monospace',
-  'jetbrains-mono': "'JetBrains Mono', monospace",
+  roboto: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  'open-sans': "'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 }
 
 const FONT_SIZES_PX: Record<AppSettings['fontSize'], string> = {
