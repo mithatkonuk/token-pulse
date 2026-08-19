@@ -179,6 +179,26 @@ Last 7d · 3998 requests · 9 sessions
       expect(result!.contributing!.last7d!.topPlugins).toEqual([{ name: 'superpowers', percent: 8 }])
     })
 
+    it('reports an explicit 0%-used five_hour window when no session is currently active, instead of dropping it', async () => {
+      const NO_ACTIVE_SESSION_TEXT = `Current week (all models): 79% used · resets Jul 26 at 10am (Europe/Berlin)
+
+Last 24h · 0 requests · 0 sessions
+
+Last 7d · 3998 requests · 9 sessions
+`
+      const p = provider(async () => NO_ACTIVE_SESSION_TEXT)
+      const result = await p.getUsageFromCommand('/some/cwd')
+      expect(result).not.toBeNull()
+      expect(result!.windows).toContainEqual({ id: 'five_hour', label: 'Every 5 hours', percentUsed: 0, resetsText: null })
+    })
+
+    it('omits the five_hour window entirely (does not synthesize 0%) when the output is garbage/error text with no weekly line either', async () => {
+      const p = provider(async () => 'Something unrelated happened.')
+      const result = await p.getUsageFromCommand('/some/cwd')
+      expect(result).not.toBeNull()
+      expect(result!.windows).toEqual([])
+    })
+
     it('passes the given cwd through to the injected command runner', async () => {
       let receivedCwd: string | null = null
       const p = provider(async (cwd) => {

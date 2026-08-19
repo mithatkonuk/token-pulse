@@ -161,6 +161,13 @@ export class ClaudeCodeProvider implements UsageProvider {
     const windows: CommandUsageResult['windows'] = []
     if (parsed.fiveHour) {
       windows.push({ id: 'five_hour', label: 'Every 5 hours', percentUsed: parsed.fiveHour.percentUsed, resetsText: parsed.fiveHour.resetsText })
+    } else if (parsed.weekly) {
+      // `/usage` only prints a "Current session" line while a 5-hour window is actually open.
+      // Once the last window fully elapses with no new usage, that line disappears entirely — the
+      // weekly line still parsing confirms this is a real, well-formed response and not a CLI
+      // error/garbage output, so it's safe to report an explicit 0%/no-active-session window
+      // rather than silently keeping whatever percentage the last real window left behind.
+      windows.push({ id: 'five_hour', label: 'Every 5 hours', percentUsed: 0, resetsText: null })
     }
     if (parsed.weekly) {
       windows.push({ id: 'weekly', label: 'Weekly', percentUsed: parsed.weekly.percentUsed, resetsText: parsed.weekly.resetsText })
