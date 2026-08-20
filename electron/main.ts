@@ -21,7 +21,7 @@ import {
   type UsageCommandScheduleConfig,
 } from '../src/main/usageCommandScheduler'
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
-import { parseResetTimestamp } from '../src/main/resetTimestamp'
+import { computeResetRefreshDelayMs } from '../src/main/resetTimestamp'
 import { isNearLimit } from '../src/main/nearLimit'
 import { buildAvailableSources, type SourceConfig } from '../src/main/buildSources'
 
@@ -36,10 +36,6 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 // Safety net in case a file watcher misses an event (rare, but fs watching isn't
 // 100% reliable cross-platform) — normal updates are watch-driven, not timed.
 const FALLBACK_POLL_MS = 60 * 1000
-
-// Small margin past the CLI-reported reset instant so the scheduled refresh doesn't land a few
-// hundred ms early and still read the pre-reset window.
-const RESET_REFRESH_BUFFER_MS = 5 * 1000
 
 // Cursor's API is unofficial and undocumented, so it gets a more conservative
 // baseline than Claude's supported CLI command.
@@ -236,12 +232,8 @@ function scheduleResetRefresh(source: SourceRuntime, windows: SourceUsage['windo
   if (!fiveHour) {
     return
   }
-  const target = parseResetTimestamp(fiveHour.resetsText)
-  if (!target) {
-    return
-  }
-  const delayMs = target.getTime() - Date.now() + RESET_REFRESH_BUFFER_MS
-  if (delayMs <= 0) {
+  const delayMs = computeResetRefreshDelayMs(fiveHour.resetsText)
+  if (delayMs === null) {
     return
   }
   source.resetRefreshTimer = setTimeout(() => {

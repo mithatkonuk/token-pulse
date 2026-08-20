@@ -30,3 +30,30 @@ export function parseResetTimestamp(resetsText: string | null, now: Date = new D
   }
   return target
 }
+
+// Small margin past the CLI-reported reset instant so the scheduled refresh doesn't land a few
+// hundred ms early and still read the pre-reset window.
+export const RESET_REFRESH_BUFFER_MS = 5 * 1000
+
+// A five_hour window's real reset is always within a bit over 5h of "now" once a poll has ever
+// seen it. parseResetTimestamp's next-year rollover exists for a genuine late-December wraparound,
+// but the exact same code path also fires when a refresh lands a few seconds after the clock target
+// while Anthropic's backend hasn't rolled the window over yet: the CLI just repeats the same
+// (now-just-barely-past) reset text, and rolling that a full year forward silently parks the next
+// attempt for 365 days instead of retrying once the reset actually lands. Any computed delay this
+// far beyond a realistic 5h window can only be that stale-race case for this specific caller, so
+// retry soon instead of trusting the year-out target.
+export const RESET_TARGET_SANITY_MS = 6 * 60 * 60 * 1000
+export const STALE_RESET_RETRY_MS = 30 * 1000
+
+export function computeResetRefreshDelayMs(resetsText: string | null, now: Date = new Date()): number | null {
+  const target = parseResetTimestamp(resetsText, now)
+  if (!target) {
+    return null
+  }
+  const delayMs = target.getTime() - now.getTime() + RESET_REFRESH_BUFFER_MS
+  if (delayMs > RESET_TARGET_SANITY_MS) {
+    return STALE_RESET_RETRY_MS
+  }
+  return delayMs > 0 ? delayMs : null
+}

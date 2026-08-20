@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseResetTimestamp } from '../src/main/resetTimestamp'
+import {
+  parseResetTimestamp,
+  computeResetRefreshDelayMs,
+  RESET_REFRESH_BUFFER_MS,
+  STALE_RESET_RETRY_MS,
+} from '../src/main/resetTimestamp'
 
 describe('parseResetTimestamp', () => {
   it('parses a time with minutes', () => {
@@ -32,5 +37,29 @@ describe('parseResetTimestamp', () => {
 
   it('returns null for null input', () => {
     expect(parseResetTimestamp(null)).toBeNull()
+  })
+})
+
+describe('computeResetRefreshDelayMs', () => {
+  it('returns the buffered delay for an upcoming reset', () => {
+    const now = new Date(2026, 7, 20, 3, 0, 0)
+    const delay = computeResetRefreshDelayMs('Aug 20 at 4:10am (Europe/Berlin)', now)
+    expect(delay).toBe(70 * 60 * 1000 + RESET_REFRESH_BUFFER_MS)
+  })
+
+  it('retries soon instead of waiting a year when the CLI repeats a just-passed reset', () => {
+    // Refresh landed 6 seconds after the reset instant, but the backend hasn't rolled the window
+    // yet, so the CLI still reports the same (now just-barely-past) text.
+    const now = new Date(2026, 7, 20, 4, 10, 6)
+    const delay = computeResetRefreshDelayMs('Aug 20 at 4:10am (Europe/Berlin)', now)
+    expect(delay).toBe(STALE_RESET_RETRY_MS)
+  })
+
+  it('returns null for unparseable text', () => {
+    expect(computeResetRefreshDelayMs('sometime soon')).toBeNull()
+  })
+
+  it('returns null for null input', () => {
+    expect(computeResetRefreshDelayMs(null)).toBeNull()
   })
 })
