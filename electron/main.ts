@@ -1,4 +1,4 @@
-import { app, ipcMain, nativeTheme } from 'electron'
+import { app, ipcMain, nativeTheme, powerMonitor } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -364,6 +364,19 @@ app.whenReady().then(() => {
   })
   setInterval(() => sources.forEach(poll), FALLBACK_POLL_MS)
   setInterval(() => sources.forEach(maybeRefreshUsageFromCommand), FALLBACK_POLL_MS)
+  // System sleep (e.g. the lid closed for hours) fully suspends this process — no timer of ours
+  // runs through it, and none should try to; forcing the whole machine to stay awake just for a
+  // usage widget isn't worth the battery cost. Instead, catch the moment it's over: 'resume'
+  // fires the instant macOS/Windows wake from sleep, and 'unlock-screen' covers waking to a
+  // locked screen (sleep and lock don't always fire together). Either is far sharper than
+  // waiting up to FALLBACK_POLL_MS for the next ambient poll tick. 'unlock-screen' doesn't fire
+  // on Linux — 'resume' alone still covers real sleep/wake there.
+  const refreshAllOnWake = (): void => {
+    sources.forEach(poll)
+    sources.forEach((source) => refreshUsageFromCommandNow(source))
+  }
+  powerMonitor.on('resume', refreshAllOnWake)
+  powerMonitor.on('unlock-screen', refreshAllOnWake)
 })
 
 app.on('window-all-closed', () => {
