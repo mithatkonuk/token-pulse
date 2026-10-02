@@ -7,6 +7,8 @@ import {
   IDLE_THRESHOLD_MS,
   NEAR_LIMIT_INTERVAL_MS,
   IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+  USER_TRIGGERED_MAX_FLOOR_MS,
+  computeImmediateRefreshFloorMs,
 } from '../src/main/usageCommandScheduler'
 
 describe('shouldRefreshUsageCommand', () => {
@@ -124,5 +126,75 @@ describe('shouldRefreshImmediately', () => {
     const backoffMs = 10 * 60 * 1000
     expect(shouldRefreshImmediately({ now: backoffMs - 1, lastRefreshAt: 0 }, backoffMs)).toBe(false)
     expect(shouldRefreshImmediately({ now: backoffMs, lastRefreshAt: 0 }, backoffMs)).toBe(true)
+  })
+})
+
+describe('computeImmediateRefreshFloorMs', () => {
+  const backoffMs = 60 * 60 * 1000
+
+  it('uses the caller floor while the source is healthy', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+        backoffMs,
+        consecutiveFailures: 0,
+        userTriggered: true,
+      })
+    ).toBe(IMMEDIATE_REFRESH_MIN_INTERVAL_MS)
+  })
+
+  it('caps a failing source so opening the panel can still retry within a minute', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+        backoffMs,
+        consecutiveFailures: 5,
+        userTriggered: true,
+      })
+    ).toBe(USER_TRIGGERED_MAX_FLOOR_MS)
+  })
+
+  it('never drops below the caller floor', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: USER_TRIGGERED_MAX_FLOOR_MS * 2,
+        backoffMs,
+        consecutiveFailures: 5,
+        userTriggered: true,
+      })
+    ).toBe(USER_TRIGGERED_MAX_FLOOR_MS * 2)
+  })
+
+  it('keeps the full backoff for triggers nobody is watching', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+        backoffMs,
+        consecutiveFailures: 5,
+        userTriggered: false,
+      })
+    ).toBe(backoffMs)
+  })
+
+  it('treats a backoff exactly at the cap as already capped', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+        backoffMs: USER_TRIGGERED_MAX_FLOOR_MS,
+        consecutiveFailures: 1,
+        userTriggered: true,
+      })
+    ).toBe(USER_TRIGGERED_MAX_FLOOR_MS)
+  })
+
+  it('still floors a failing source below the caller minimum', () => {
+    expect(
+      computeImmediateRefreshFloorMs({
+        minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
+        backoffMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS / 2,
+        consecutiveFailures: 1,
+        userTriggered: true,
+      })
+    ).toBe(IMMEDIATE_REFRESH_MIN_INTERVAL_MS)
   })
 })

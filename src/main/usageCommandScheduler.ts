@@ -51,3 +51,29 @@ export function shouldRefreshImmediately(
 ): boolean {
   return now - lastRefreshAt >= minIntervalMs
 }
+
+// A source that keeps failing gets an exponentially widening retry interval, which is right for
+// the background cadence but wrong for a human who just opened the panel: at the top of the
+// backoff that lockout is an hour long, so the bars stay frozen with no way to recover short of
+// restarting the app. Clicks get the backoff capped here instead; background triggers keep it.
+export const USER_TRIGGERED_MAX_FLOOR_MS = 60 * 1000
+
+export interface ImmediateRefreshFloorState {
+  minIntervalMs: number
+  backoffMs: number
+  consecutiveFailures: number
+  userTriggered: boolean
+}
+
+export function computeImmediateRefreshFloorMs({
+  minIntervalMs,
+  backoffMs,
+  consecutiveFailures,
+  userTriggered,
+}: ImmediateRefreshFloorState): number {
+  if (consecutiveFailures <= 0) {
+    return minIntervalMs
+  }
+  const effectiveBackoffMs = userTriggered ? Math.min(backoffMs, USER_TRIGGERED_MAX_FLOOR_MS) : backoffMs
+  return Math.max(minIntervalMs, effectiveBackoffMs)
+}

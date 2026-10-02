@@ -15,11 +15,13 @@ import { readSettings, writeSettings } from '../src/main/settingsStore'
 import {
   shouldRefreshUsageCommand,
   shouldRefreshImmediately,
+  computeImmediateRefreshFloorMs,
   ACTIVE_INTERVAL_MS,
   NEAR_LIMIT_INTERVAL_MS,
   IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
   type UsageCommandScheduleConfig,
 } from '../src/main/usageCommandScheduler'
+import { createUsageLog, type UsageLogTrigger } from '../src/main/usageLog'
 import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 import { computeResetRefreshDelayMs } from '../src/main/resetTimestamp'
 import { isNearLimit } from '../src/main/nearLimit'
@@ -45,6 +47,8 @@ const CURSOR_ACTIVE_INTERVAL_MS = 5 * 60 * 1000
 // calls don't get attributed to whatever project you're actually working in.
 const USAGE_COMMAND_CWD = path.join(app.getPath('userData'), 'usage-check-cwd')
 fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
+
+const logUsageAttempt = createUsageLog(path.join(app.getPath('userData'), 'logs', 'usage.log'))
 
 interface SourceRuntime {
   id: string
@@ -152,7 +156,11 @@ function onWatchedFileActivity(source: SourceRuntime): void {
   // during an active session (every streamed turn), so a 15s floor would re-spawn the usage-check
   // subprocess nearly 4x a minute for the whole session — busier than even the dedicated near-cap
   // fast path, which defeats the point of that path being the "watching most closely" cadence.
-  refreshUsageFromCommandNow(source, NEAR_LIMIT_INTERVAL_MS)
+  refreshUsageFromCommandNow(source, {
+    trigger: 'file-activity',
+    minIntervalMs: NEAR_LIMIT_INTERVAL_MS,
+    userTriggered: false,
+  })
 }
 
 function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
@@ -181,41 +189,51 @@ function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
       scheduleConfig
     )
   ) {
-    source.lastRefreshAt = now
-    source.refreshInFlight = true
-    void refreshUsageFromCommand(source)
+    startRefresh(source, now, 'scheduled')
   }
 }
 
-// Shared by "the panel was just opened" and "a watched file just changed" — both are a direct
-// signal that someone is actually using the source right now, so both deserve an immediate,
-// real usage-command check rather than waiting on the ambient 3-10 minute cadence, floored by
-// minIntervalMs so a burst of triggers (repeated tray clicks, a flurry of file writes) can't spawn
-// a subprocess per event. Callers pick their own floor: tray-open is a rare, human-triggered event
-// so it gets the tightest floor (IMMEDIATE_REFRESH_MIN_INTERVAL_MS); file activity happens
-// continuously during a session, so it uses a wider one to avoid becoming the busiest cadence in
-// the app (see call site in onWatchedFileActivity).
-function refreshUsageFromCommandNow(
-  source: SourceRuntime,
-  minIntervalMs: number = IMMEDIATE_REFRESH_MIN_INTERVAL_MS
-): void {
+function startRefresh(source: SourceRuntime, now: number, trigger: UsageLogTrigger): void {
+  source.lastRefreshAt = now
+  source.refreshInFlight = true
+  void refreshUsageFromCommand(source, trigger)
+}
+
+interface ImmediateRefreshOptions {
+  trigger: UsageLogTrigger
+  minIntervalMs?: number
+  // Defaults to true: every trigger but watched-file activity is a one-shot event with someone
+  // right there looking at the panel, so it gets the capped backoff rather than the full one.
+  userTriggered?: boolean
+}
+
+// Every direct signal that the source is being used right now — a click, a wake, a watched file
+// changing — jumps the ambient 3-10 minute cadence. minIntervalMs keeps a burst of those from
+// spawning a subprocess per event; callers pick their own, since file activity fires continuously
+// during a session while a click does not.
+function refreshUsageFromCommandNow(source: SourceRuntime, options: ImmediateRefreshOptions): void {
+  const { trigger, minIntervalMs = IMMEDIATE_REFRESH_MIN_INTERVAL_MS, userTriggered = true } = options
   // This is activity, so a source that had gone idle must not stay on the idle cadence for its
   // next scheduled refresh either.
   source.lastActivityAt = Date.now()
+  const { consecutiveFailures } = source
+  const logSkip = (outcome: 'skipped-in-flight' | 'skipped-floor', floorMs?: number): void =>
+    logUsageAttempt({ at: source.lastActivityAt, sourceId: source.id, trigger, outcome, consecutiveFailures, floorMs })
   if (source.refreshInFlight) {
+    logSkip('skipped-in-flight')
     return
   }
-  const baseActiveIntervalMs = source.activeIntervalMs ?? ACTIVE_INTERVAL_MS
-  const floorMs =
-    source.consecutiveFailures > 0
-      ? computeBackoffIntervalMs(baseActiveIntervalMs, source.consecutiveFailures)
-      : minIntervalMs
+  const floorMs = computeImmediateRefreshFloorMs({
+    minIntervalMs,
+    backoffMs: computeBackoffIntervalMs(source.activeIntervalMs ?? ACTIVE_INTERVAL_MS, consecutiveFailures),
+    consecutiveFailures,
+    userTriggered,
+  })
   if (!shouldRefreshImmediately({ now: source.lastActivityAt, lastRefreshAt: source.lastRefreshAt }, floorMs)) {
+    logSkip('skipped-floor', floorMs)
     return
   }
-  source.lastRefreshAt = source.lastActivityAt
-  source.refreshInFlight = true
-  void refreshUsageFromCommand(source)
+  startRefresh(source, source.lastActivityAt, trigger)
 }
 
 // The regular active/idle polling cadence (3-10 min) is deliberately relaxed to avoid wasteful
@@ -241,20 +259,30 @@ function scheduleResetRefresh(source: SourceRuntime, windows: SourceUsage['windo
     if (source.refreshInFlight) {
       return
     }
-    source.lastRefreshAt = Date.now()
-    source.refreshInFlight = true
-    void refreshUsageFromCommand(source)
+    startRefresh(source, Date.now(), 'reset-boundary')
   }, delayMs)
 }
 
-async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
+async function refreshUsageFromCommand(source: SourceRuntime, trigger: UsageLogTrigger): Promise<void> {
+  const startedAt = Date.now()
+  const record = (outcome: 'ok' | 'empty' | 'error'): void =>
+    logUsageAttempt({
+      at: Date.now(),
+      sourceId: source.id,
+      trigger,
+      outcome,
+      durationMs: Date.now() - startedAt,
+      consecutiveFailures: source.consecutiveFailures,
+    })
   try {
     const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
     if (result === null) {
       source.consecutiveFailures += 1
+      record('empty')
       return
     }
     source.consecutiveFailures = 0
+    record('ok')
     const existing = state.usageBySource[source.id]
     state = {
       ...state,
@@ -277,6 +305,7 @@ async function refreshUsageFromCommand(source: SourceRuntime): Promise<void> {
     // TLS) must not become an unhandled rejection in the main process; treat it the same as
     // an explicit null result so the failure backoff still engages.
     source.consecutiveFailures += 1
+    record('error')
   } finally {
     source.refreshInFlight = false
   }
@@ -295,7 +324,7 @@ ipcMain.handle('source:select', (_event, sourceId: string) => {
   // pushState's tray-icon update silently no-ops and the tray keeps showing the previous source.
   const selected = sources.find((s) => s.id === sourceId)
   if (selected) {
-    refreshUsageFromCommandNow(selected)
+    refreshUsageFromCommandNow(selected, { trigger: 'source-switch' })
   }
 })
 
@@ -331,7 +360,7 @@ app.whenReady().then(() => {
       pushState()
     } else {
       sources.forEach(poll)
-      sources.forEach(refreshUsageFromCommandNow)
+      sources.forEach((source) => refreshUsageFromCommandNow(source, { trigger: 'panel-open' }))
     }
   }, (trayRef, view) => {
     const win = showPopup(trayRef, PRELOAD_PATH, { devServerUrl: VITE_DEV_SERVER_URL, rendererDist: RENDERER_DIST })
@@ -347,11 +376,7 @@ app.whenReady().then(() => {
   nativeTheme.on('updated', pushState)
   sources.forEach(poll)
   const now = Date.now()
-  sources.forEach((s) => {
-    s.lastRefreshAt = now
-    s.refreshInFlight = true
-  })
-  sources.forEach((s) => void refreshUsageFromCommand(s))
+  sources.forEach((s) => startRefresh(s, now, 'startup'))
   sources.forEach((source) => {
     chokidar
       .watch(source.provider.getWatchedPaths(), {
@@ -373,7 +398,7 @@ app.whenReady().then(() => {
   // on Linux — 'resume' alone still covers real sleep/wake there.
   const refreshAllOnWake = (): void => {
     sources.forEach(poll)
-    sources.forEach((source) => refreshUsageFromCommandNow(source))
+    sources.forEach((source) => refreshUsageFromCommandNow(source, { trigger: 'wake' }))
   }
   powerMonitor.on('resume', refreshAllOnWake)
   powerMonitor.on('unlock-screen', refreshAllOnWake)
