@@ -11,6 +11,7 @@ afterEach(() => {
 function baseUsage(): SourceUsage {
   return {
     planTier: null,
+    accountEmail: null,
     currentModel: null,
     windows: [],
     contextWindow: null,

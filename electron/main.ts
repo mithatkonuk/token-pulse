@@ -85,6 +85,7 @@ const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((confi
 function emptySourceUsage(): SourceUsage {
   return {
     planTier: null,
+    accountEmail: null,
     currentModel: null,
     windows: [],
     contextWindow: null,
@@ -138,6 +139,7 @@ function poll(source: SourceRuntime): void {
       [source.id]: {
         ...existing,
         planTier: source.provider.getPlanTier(),
+        accountEmail: source.provider.getAccountEmail(),
         currentModel: cached.currentModel,
         contextWindow: cached.contextWindow,
         updatedAt: new Date().toISOString(),

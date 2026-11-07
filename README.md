@@ -145,6 +145,15 @@ This runs `tsc --noEmit && vite build && electron-builder`, producing installers
 
 electron-builder only cross-builds some targets from macOS without extra tooling — building the Windows/Linux installers for real is easiest done on (or in a container for) that target OS. The config for all three lives in `electron-builder.json5` and doesn't need changes to add a platform's build — just run `npm run build` on that OS.
 
+**Signing and build time (macOS):** electron-builder signs with whatever code-signing certificate it finds in your keychain (e.g. an "Apple Development" one) and calls Apple's timestamp server for every nested binary, so a signed build can take several minutes. With no certificate it builds unsigned and much faster. Either way the app is not notarized.
+
+**Installing locally:** wait for `npm run build` to fully exit (the `.app` appears before signing finishes — copying it early gives a broken app), quit any running token-pulse from its tray icon, then either open the dmg and drag the app to Applications, or:
+
+```bash
+rm -rf /Applications/token-pulse.app
+cp -R release/<version>/mac-arm64/token-pulse.app /Applications/
+```
+
 To launch the packaged macOS app directly instead of via the dmg:
 
 ```bash

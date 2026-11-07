@@ -62,6 +62,17 @@ export class ClaudeCodeProvider implements UsageProvider {
     }
   }
 
+  getAccountEmail(): string | null {
+    try {
+      const raw = fs.readFileSync(this.claudeJsonPath, 'utf-8')
+      const parsed = JSON.parse(raw) as { oauthAccount?: { emailAddress?: unknown } }
+      const email = parsed.oauthAccount?.emailAddress
+      return typeof email === 'string' && email !== '' ? email : null
+    } catch {
+      return null
+    }
+  }
+
   // Session transcripts are written by both the CLI and the desktop app, so they track the
   // model the user actually picked. The statusline cache only updates while the CLI renders
   // its statusline, which never happens in the desktop app — hence the fallback ordering.

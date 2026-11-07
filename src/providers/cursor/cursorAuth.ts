@@ -23,3 +23,19 @@ export function readCursorAccessToken(dbPath: string = defaultCursorStateDbPath(
     return null
   }
 }
+
+export function readCursorEmail(dbPath: string = defaultCursorStateDbPath()): string | null {
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true })
+    try {
+      const row = db.prepare('SELECT value FROM ItemTable WHERE key = ?').get('cursorAuth/cachedEmail') as
+        | { value: string }
+        | undefined
+      return row?.value ? row.value : null
+    } finally {
+      db.close()
+    }
+  } catch {
+    return null
+  }
+}

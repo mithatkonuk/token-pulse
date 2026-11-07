@@ -53,6 +53,7 @@ export interface AppSettings {
 
 export interface SourceUsage {
   planTier: string | null
+  accountEmail: string | null
   currentModel: string | null
   windows: UsageWindow[]
   contextWindow: ContextWindow | null

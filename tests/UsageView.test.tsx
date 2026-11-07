@@ -11,6 +11,7 @@ afterEach(() => {
 function baseState(overrides: Partial<SourceUsage> = {}): SourceUsage {
   return {
     planTier: null,
+    accountEmail: null,
     currentModel: null,
     windows: [],
     contextWindow: null,
@@ -56,5 +57,16 @@ describe('UsageView', () => {
     )
     expect(screen.getByText('auto')).toBeInTheDocument()
     expect(screen.getByText('23.4k tok')).toBeInTheDocument()
+  })
+
+  it('shows who is signed in when an account email is present', () => {
+    render(<UsageView state={baseState({ accountEmail: 'me@example.com' })} />)
+    expect(screen.getByText('Signed in as')).toBeInTheDocument()
+    expect(screen.getByText('me@example.com')).toBeInTheDocument()
+  })
+
+  it('shows no signed-in row when the account email is null', () => {
+    render(<UsageView state={baseState()} />)
+    expect(screen.queryByText('Signed in as')).not.toBeInTheDocument()
   })
 })

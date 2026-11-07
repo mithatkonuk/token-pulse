@@ -5,6 +5,7 @@ import type { SourceUsage } from '../src/shared/types'
 function usageWithWindows(windows: SourceUsage['windows']): SourceUsage {
   return {
     planTier: null,
+    accountEmail: null,
     currentModel: null,
     windows,
     contextWindow: null,

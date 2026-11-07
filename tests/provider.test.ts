@@ -34,6 +34,20 @@ describe('ClaudeCodeProvider', () => {
     expect(provider().getPlanTier()).toBe('claude_max_5x')
   })
 
+  it('reads the signed-in account email from claude.json', () => {
+    fs.writeFileSync(
+      claudeJsonPath,
+      JSON.stringify({ oauthAccount: { organizationType: 'claude_team', emailAddress: 'me@example.com' } })
+    )
+    expect(provider().getAccountEmail()).toBe('me@example.com')
+  })
+
+  it('returns a null account email when claude.json has none or is missing', () => {
+    expect(provider().getAccountEmail()).toBeNull()
+    const p = new ClaudeCodeProvider({ claudeJsonPath: path.join(dir, 'missing.json'), statuslineCachePath })
+    expect(p.getAccountEmail()).toBeNull()
+  })
+
   it('falls back to null when claude.json is missing', () => {
     const p = new ClaudeCodeProvider({ claudeJsonPath: path.join(dir, 'missing.json'), statuslineCachePath })
     expect(p.getPlanTier()).toBeNull()

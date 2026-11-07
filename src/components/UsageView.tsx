@@ -139,6 +139,17 @@ export function UsageView({ state }: { state: SourceUsage }) {
       <CostSection cost={state.cost} />
       <ContributingStatsSection contributing={state.contributing} />
       <ActivitySection recentActivity={state.recentActivity} />
+      {state.accountEmail && (
+        <>
+          <hr className="widget-panel__separator" />
+          <div className="usage-account">
+            <span>Signed in as</span>
+            <span className="usage-account__email" title={state.accountEmail}>
+              {state.accountEmail}
+            </span>
+          </div>
+        </>
+      )}
       {state.cacheUpdatedAt && (
         <>
           <hr className="widget-panel__separator" />

@@ -2,7 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
 import type { UsageEvent } from '../../shared/types'
-import { readCursorAccessToken } from './cursorAuth'
+import { readCursorAccessToken, readCursorEmail } from './cursorAuth'
 import { fetchCurrentPeriodUsage, fetchFilteredUsageEvents, type CursorPeriodUsage, type CursorUsageEvent } from './dashboardClient'
 
 const MAX_RECENT_ACTIVITY = 5
@@ -10,6 +10,7 @@ const MAX_RECENT_ACTIVITY = 5
 export interface CursorProviderOptions {
   chatsDir?: string
   readAccessTokenFn?: () => string | null
+  readEmailFn?: () => string | null
   fetchCurrentPeriodUsageFn?: (accessToken: string) => Promise<CursorPeriodUsage | null>
   fetchFilteredUsageEventsFn?: (accessToken: string) => Promise<CursorUsageEvent[] | null>
 }
@@ -29,6 +30,7 @@ function formatResetDate(epochMs: number): string {
 export class CursorProvider implements UsageProvider {
   private readonly chatsDir: string
   private readonly readAccessTokenFn: () => string | null
+  private readonly readEmailFn: () => string | null
   private readonly fetchCurrentPeriodUsageFn: (accessToken: string) => Promise<CursorPeriodUsage | null>
   private readonly fetchFilteredUsageEventsFn: (accessToken: string) => Promise<CursorUsageEvent[] | null>
   private lastPlanTier: string | null = null
@@ -36,6 +38,7 @@ export class CursorProvider implements UsageProvider {
   constructor(options: CursorProviderOptions = {}) {
     this.chatsDir = options.chatsDir ?? path.join(os.homedir(), '.cursor', 'chats')
     this.readAccessTokenFn = options.readAccessTokenFn ?? readCursorAccessToken
+    this.readEmailFn = options.readEmailFn ?? readCursorEmail
     this.fetchCurrentPeriodUsageFn = options.fetchCurrentPeriodUsageFn ?? ((token) => fetchCurrentPeriodUsage(token))
     this.fetchFilteredUsageEventsFn = options.fetchFilteredUsageEventsFn ?? ((token) => fetchFilteredUsageEvents(token))
   }
@@ -50,6 +53,10 @@ export class CursorProvider implements UsageProvider {
 
   getPlanTier(): string | null {
     return this.lastPlanTier
+  }
+
+  getAccountEmail(): string | null {
+    return this.readEmailFn()
   }
 
   getCachedUsage(): CachedUsage {

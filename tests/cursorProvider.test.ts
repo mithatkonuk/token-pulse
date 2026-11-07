@@ -23,6 +23,11 @@ function fakeEvent(overrides: Partial<CursorUsageEvent> = {}): CursorUsageEvent 
 }
 
 describe('CursorProvider', () => {
+  it('exposes the account email from the injected reader', () => {
+    expect(new CursorProvider({ readEmailFn: () => 'me@example.com' }).getAccountEmail()).toBe('me@example.com')
+    expect(new CursorProvider({ readEmailFn: () => null }).getAccountEmail()).toBeNull()
+  })
+
   it('returns null when there is no access token', async () => {
     const provider = new CursorProvider({ readAccessTokenFn: () => null })
     expect(await provider.getUsageFromCommand()).toBeNull()

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { readCursorAccessToken } from '../src/providers/cursor/cursorAuth'
+import { readCursorAccessToken, readCursorEmail } from '../src/providers/cursor/cursorAuth'
 
 let dir: string
 let dbPath: string
@@ -40,5 +40,21 @@ describe('readCursorAccessToken', () => {
 
   it('returns null when the database file does not exist', () => {
     expect(readCursorAccessToken(path.join(dir, 'missing.vscdb'))).toBeNull()
+  })
+})
+
+describe('readCursorEmail', () => {
+  it('reads the cached email from the ItemTable', () => {
+    createStateDb({ 'cursorAuth/cachedEmail': 'me@example.com' })
+    expect(readCursorEmail(dbPath)).toBe('me@example.com')
+  })
+
+  it('returns null when the key is missing or empty', () => {
+    createStateDb({ 'cursorAuth/cachedEmail': '' })
+    expect(readCursorEmail(dbPath)).toBeNull()
+  })
+
+  it('returns null when the database file does not exist', () => {
+    expect(readCursorEmail(path.join(dir, 'missing.vscdb'))).toBeNull()
   })
 })

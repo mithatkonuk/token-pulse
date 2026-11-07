@@ -17,6 +17,7 @@ export interface UsageProvider {
   isAvailable(): boolean
   getWatchedPaths(): string[]
   getPlanTier(): string | null
+  getAccountEmail(): string | null
   getCachedUsage(): CachedUsage
   getUsageFromCommand(cwd: string): Promise<CommandUsageResult | null>
 }

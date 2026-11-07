@@ -162,6 +162,20 @@
   font-weight: 600;
 }
 
+.usage-account {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85em;
+}
+
+.usage-account__email {
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .usage-cost {
   display: flex;
   justify-content: space-between;
