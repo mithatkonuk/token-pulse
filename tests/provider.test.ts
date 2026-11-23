@@ -229,3 +229,63 @@ Last 7d · 3998 requests · 9 sessions
     })
   })
 })
+
+describe('ClaudeCodeProvider cached limits', () => {
+  const now = Date.parse('2026-11-23T13:40:00Z')
+  const account = 'account-a'
+
+  function providerAt(at: number) {
+    return new ClaudeCodeProvider({ claudeJsonPath, statuslineCachePath, projectsDir, nowFn: () => at })
+  }
+
+  function writeClaudeJsonCache(fiveHourPercent: number) {
+    fs.writeFileSync(
+      claudeJsonPath,
+      JSON.stringify({
+        oauthAccount: { accountUuid: account },
+        cachedUsageUtilization: {
+          fetchedAtMs: now - 10_000,
+          accountUuid: account,
+          utilization: { five_hour: { utilization: fiveHourPercent, resets_at: '2026-11-23T17:00:00Z' }, seven_day: null },
+        },
+      })
+    )
+  }
+
+  function writeStatuslineCache(fiveHourPercent: number) {
+    fs.writeFileSync(
+      statuslineCachePath,
+      JSON.stringify({
+        five_hour: { used_percentage: fiveHourPercent, resets_at: Date.parse('2026-11-23T17:00:00Z') / 1000 },
+        seven_day: null,
+        updated_at: new Date(now - 20_000).toISOString(),
+      })
+    )
+  }
+
+  it('returns null limits when no cache file has usable limits', () => {
+    expect(providerAt(now).getCachedUsage().limits).toBeNull()
+  })
+
+  it('reads the limits from claude.json when the statusline cache has none', () => {
+    writeClaudeJsonCache(31)
+    expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(31)
+  })
+
+  it('prefers the statusline cache, because its fields are documented', () => {
+    writeClaudeJsonCache(31)
+    writeStatuslineCache(29)
+    expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(29)
+  })
+
+  it('uses claude.json when the statusline cache is too old', () => {
+    writeClaudeJsonCache(31)
+    writeStatuslineCache(29)
+    expect(providerAt(now + 285_000).getCachedUsage().limits?.windows[0].percentUsed).toBe(31)
+  })
+
+  it('returns null limits when claude.json is not valid JSON', () => {
+    fs.writeFileSync(claudeJsonPath, '{"oauthAccount":')
+    expect(providerAt(now).getCachedUsage().limits).toBeNull()
+  })
+})

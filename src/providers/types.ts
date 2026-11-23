@@ -1,8 +1,14 @@
 import type { ContextWindow, Contributing, CostSummary, UsageEvent, UsageWindow } from '../shared/types'
 
+export interface CachedLimits {
+  windows: UsageWindow[]
+  fetchedAt: string
+}
+
 export interface CachedUsage {
   currentModel: string | null
   contextWindow: ContextWindow | null
+  limits: CachedLimits | null
 }
 
 export interface CommandUsageResult {

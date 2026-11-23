@@ -59,6 +59,11 @@ token-pulse never asks you to create a credential. It reuses the Anthropic sessi
   <img src="docs/screenshots/claude-with-selector.png" width="320" alt="Claude Code view — header is now a clickable source selector when Cursor is also detected">
 </p>
 
+- **Usage bars from cache files** — token-pulse reads the limits from disk first, in this sequence:
+  1. `~/.claude/token-pulse-cache.json`, which the optional personal statusline script writes from the documented `rate_limits` statusline field. Only an interactive terminal session runs the statusline.
+  2. `cachedUsageUtilization` in `~/.claude.json`. Claude Code writes this field each time it gets the usage. The field is not documented, so a new Claude Code release can change it. Token-pulse uses it only when its `accountUuid` is the same as the signed-in account.
+
+  Token-pulse uses a cache only when it is less than 5 minutes old. A file change with a fresh cache updates the bars immediately and does not start the `/usage` subprocess. When no cache is fresh, or the format is not known, the `/usage` command below gives the numbers.
 - **Usage bars & limits breakdown** — runs `claude -p "/usage"` as a real subprocess, from its own scratch directory, cleaning up the transcript it creates. It's the only network call the app makes. Polls every 3 minutes while active, backing off to every 10 minutes after 15 minutes of inactivity.
 - **Model name & context window** — read live from your newest session transcript (`~/.claude/projects/**/*.jsonl`), so it works for both CLI and Desktop sessions. Falls back to an optional personal statusline cache (`~/.claude/token-pulse-cache.json`) if no transcript is available.
 - **Plan tier** — read from `~/.claude.json`.

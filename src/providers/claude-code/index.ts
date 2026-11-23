@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { ContextWindow } from '../../shared/types'
-import type { CachedUsage, CommandUsageResult, UsageProvider } from '../types'
+import type { CachedLimits, CachedUsage, CommandUsageResult, UsageProvider } from '../types'
+import { readClaudeJsonLimits, readStatuslineLimits } from './cachedLimits'
 import { getContextWindowSizeForModel } from './modelContextWindows'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from './transcript'
 import { parseUsageOutput, runUsageCommand, isClaudeCliAvailable } from './usageCommand'
@@ -23,6 +24,15 @@ export interface ClaudeCodeProviderOptions {
   runUsageCommandFn?: (cwd: string) => Promise<string | null>
   isAvailableFn?: () => boolean
   hasLocalDataFn?: () => boolean
+  nowFn?: () => number
+}
+
+function readJsonFile(filePath: string): unknown {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as unknown
+  } catch {
+    return null
+  }
 }
 
 export class ClaudeCodeProvider implements UsageProvider {
@@ -32,6 +42,7 @@ export class ClaudeCodeProvider implements UsageProvider {
   private readonly runUsageCommandFn: (cwd: string) => Promise<string | null>
   private readonly isAvailableFn: () => boolean
   private readonly hasLocalDataFn: () => boolean
+  private readonly nowFn: () => number
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     const home = os.homedir()
@@ -42,6 +53,7 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.isAvailableFn = options.isAvailableFn ?? isClaudeCliAvailable
     this.hasLocalDataFn =
       options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))
+    this.nowFn = options.nowFn ?? Date.now
   }
 
   isAvailable(): boolean {
@@ -155,10 +167,21 @@ export class ClaudeCodeProvider implements UsageProvider {
     }
   }
 
+  // The statusline cache comes first, because its fields come from the documented statusline input.
+  // The `cachedUsageUtilization` field in claude.json is not documented, so it comes second.
+  private getLimitsFromCaches(): CachedLimits | null {
+    const now = this.nowFn()
+    return (
+      readStatuslineLimits(readJsonFile(this.statuslineCachePath), now) ??
+      readClaudeJsonLimits(readJsonFile(this.claudeJsonPath), now)
+    )
+  }
+
   getCachedUsage(): CachedUsage {
     return {
       currentModel: this.getModelFromTranscript() ?? this.getModelFromStatuslineCache(),
       contextWindow: this.getContextWindowFromTranscript() ?? this.getContextWindowFromStatuslineCache(),
+      limits: this.getLimitsFromCaches(),
     }
   }
 

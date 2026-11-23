@@ -60,7 +60,7 @@ export class CursorProvider implements UsageProvider {
   }
 
   getCachedUsage(): CachedUsage {
-    return { currentModel: null, contextWindow: null }
+    return { currentModel: null, contextWindow: null, limits: null }
   }
 
   async getUsageFromCommand(): Promise<CommandUsageResult | null> {

@@ -60,6 +60,9 @@ interface SourceRuntime {
   consecutiveFailures: number
   refreshInFlight: boolean
   resetRefreshTimer: NodeJS.Timeout | null
+  // True while a cache file on disk holds limits that are not too old. Then the limit bars do not
+  // need the `/usage` subprocess for each file change or for the near-limit cadence.
+  hasFreshCachedLimits: boolean
 }
 
 // Both providers are probed for availability the same way — no special-casing either one.
@@ -80,6 +83,7 @@ const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((confi
   consecutiveFailures: 0,
   refreshInFlight: false,
   resetRefreshTimer: null,
+  hasFreshCachedLimits: false,
 }))
 
 function emptySourceUsage(): SourceUsage {
@@ -129,9 +133,17 @@ function pushState(): void {
   }
 }
 
+// The `/usage` result and the cache files can arrive in any sequence. Only limits that are newer
+// than the limits on the panel replace them, so an old cache never hides a new `/usage` result.
+function isNewerThan(fetchedAt: string, current: string | null): boolean {
+  return current === null || Date.parse(fetchedAt) > Date.parse(current)
+}
+
 function poll(source: SourceRuntime): void {
   const cached = source.provider.getCachedUsage()
   const existing = state.usageBySource[source.id]
+  source.hasFreshCachedLimits = cached.limits !== null
+  const cachedLimits = cached.limits !== null && isNewerThan(cached.limits.fetchedAt, existing.cacheUpdatedAt) ? cached.limits : null
   state = {
     ...state,
     usageBySource: {
@@ -143,14 +155,30 @@ function poll(source: SourceRuntime): void {
         currentModel: cached.currentModel,
         contextWindow: cached.contextWindow,
         updatedAt: new Date().toISOString(),
+        ...(cachedLimits === null ? {} : { windows: cachedLimits.windows, cacheUpdatedAt: cachedLimits.fetchedAt }),
       },
     },
   }
   pushState()
+  if (cachedLimits !== null) {
+    scheduleResetRefresh(source, cachedLimits.windows)
+  }
 }
 
 function onWatchedFileActivity(source: SourceRuntime): void {
   poll(source)
+  // Claude Code writes its cache files many times each minute. When a cache holds new limits,
+  // poll() already shows them, and a `/usage` subprocess for each write gives no new data.
+  if (source.hasFreshCachedLimits) {
+    logUsageAttempt({
+      at: Date.now(),
+      sourceId: source.id,
+      trigger: 'file-activity',
+      outcome: 'skipped-cache',
+      consecutiveFailures: source.consecutiveFailures,
+    })
+    return
+  }
   // A watched file changing means Claude was just actually used — that's a far more direct signal
   // than "wait for the next 3-minute tick," so check the real usage command now instead of only
   // refreshing the cheap cached display fields. Floored at NEAR_LIMIT_INTERVAL_MS rather than the
@@ -182,7 +210,9 @@ function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
   // Only honor near-limit while the source is healthy — a failing source is already on its own
   // backoff cadence via effectiveActiveIntervalMs above, and nearLimit must not override that
   // (it would turn a capped retry backoff into an unbounded 30s retry storm).
-  if (source.consecutiveFailures === 0 && isNearLimit(state.usageBySource[source.id])) {
+  // A fresh cache already updates the bars near the limit, so the 30s subprocess cadence is not
+  // necessary then.
+  if (source.consecutiveFailures === 0 && !source.hasFreshCachedLimits && isNearLimit(state.usageBySource[source.id])) {
     scheduleConfig.nearLimit = true
   }
   if (

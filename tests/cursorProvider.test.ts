@@ -94,7 +94,7 @@ describe('CursorProvider', () => {
 
   it('returns null current model and context window from the cached-usage path', () => {
     const provider = new CursorProvider()
-    expect(provider.getCachedUsage()).toEqual({ currentModel: null, contextWindow: null })
+    expect(provider.getCachedUsage()).toEqual({ currentModel: null, contextWindow: null, limits: null })
   })
 })
 
