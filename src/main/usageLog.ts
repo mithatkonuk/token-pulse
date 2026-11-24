@@ -6,7 +6,7 @@ import path from 'node:path'
 // enough to tell those apart after the fact.
 const DEFAULT_MAX_BYTES = 256 * 1024
 
-export type UsageLogOutcome = 'ok' | 'empty' | 'error' | 'skipped-in-flight' | 'skipped-floor' | 'skipped-cache'
+export type UsageLogOutcome = 'ok' | 'empty' | 'error' | 'skipped-in-flight' | 'skipped-floor'
 
 export type UsageLogTrigger =
   | 'startup'

@@ -77,3 +77,12 @@ export function computeImmediateRefreshFloorMs({
   const effectiveBackoffMs = userTriggered ? Math.min(backoffMs, USER_TRIGGERED_MAX_FLOOR_MS) : backoffMs
   return Math.max(minIntervalMs, effectiveBackoffMs)
 }
+
+// A cache file holds limits from a `/usage` fetch at a known time, so it counts as a refresh at
+// that time. Then the usual floors decide when the next subprocess runs. Our own subprocess also
+// writes the cache before it exits: that cache is not newer than our refresh, so it does not stop
+// the next refresh. Only a fetch by another Claude Code process can do that.
+export function lastRefreshAtAfterCache(lastRefreshAt: number, cacheFetchedAt: string | null): number {
+  const fetchedAtMs = cacheFetchedAt === null ? NaN : Date.parse(cacheFetchedAt)
+  return Number.isFinite(fetchedAtMs) ? Math.max(lastRefreshAt, fetchedAtMs) : lastRefreshAt
+}

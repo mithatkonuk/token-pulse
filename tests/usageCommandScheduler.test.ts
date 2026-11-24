@@ -9,6 +9,7 @@ import {
   IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
   USER_TRIGGERED_MAX_FLOOR_MS,
   computeImmediateRefreshFloorMs,
+  lastRefreshAtAfterCache,
 } from '../src/main/usageCommandScheduler'
 
 describe('shouldRefreshUsageCommand', () => {
@@ -196,5 +197,25 @@ describe('computeImmediateRefreshFloorMs', () => {
         userTriggered: true,
       })
     ).toBe(IMMEDIATE_REFRESH_MIN_INTERVAL_MS)
+  })
+})
+
+describe('lastRefreshAtAfterCache', () => {
+  it('moves the refresh time forward to a newer cache fetch', () => {
+    expect(lastRefreshAtAfterCache(1_000, new Date(5_000).toISOString())).toBe(5_000)
+  })
+
+  it('keeps the refresh time when the cache is older than the last refresh', () => {
+    // Our own `/usage` subprocess writes the cache before it exits, so that cache is not newer
+    // than the refresh that wrote it, and it must not count as a second refresh.
+    expect(lastRefreshAtAfterCache(5_000, new Date(1_000).toISOString())).toBe(5_000)
+  })
+
+  it('keeps the refresh time when no cache limits were applied', () => {
+    expect(lastRefreshAtAfterCache(5_000, null)).toBe(5_000)
+  })
+
+  it('keeps the refresh time when the cache time is not a valid date', () => {
+    expect(lastRefreshAtAfterCache(5_000, 'not a date')).toBe(5_000)
   })
 })
