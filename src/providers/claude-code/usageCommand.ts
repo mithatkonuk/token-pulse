@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -49,33 +48,14 @@ export interface UsageCommandResult {
   last7d: ContributingStats | null
 }
 
-// `claude -p` starts a brand-new session every call, which writes a transcript file under
-// projectsDir as a side effect. We pin the session ID ourselves so we know exactly which file
-// that is, and delete it once we've read the output — otherwise it accumulates forever on a
-// recurring poll.
-function deleteSessionTranscript(projectsDir: string, sessionId: string): void {
-  let projects: string[]
-  try {
-    projects = fs.readdirSync(projectsDir)
-  } catch {
-    return
-  }
-  for (const project of projects) {
-    try {
-      fs.unlinkSync(path.join(projectsDir, project, `${sessionId}.jsonl`))
-      return
-    } catch {
-      // Not this project directory — keep looking.
-    }
-  }
-}
-
-export function runUsageCommand(cwd: string, projectsDir: string): Promise<string | null> {
-  const sessionId = randomUUID()
+// `claude -p` starts a new session for each call. `--no-session-persistence` tells the CLI not to
+// write a transcript for it, so token-pulse never needs to delete files in `~/.claude/projects`.
+// Token-pulse only reads Claude files. The CLI itself still updates its own `~/.claude.json`.
+export function runUsageCommand(cwd: string): Promise<string | null> {
   return new Promise((resolve) => {
     execFile(
       'claude',
-      ['-p', '/usage', '--session-id', sessionId, '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'],
+      ['-p', '/usage', '--no-session-persistence', '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'],
       {
         cwd,
         timeout: USAGE_COMMAND_TIMEOUT_MS,
@@ -83,7 +63,6 @@ export function runUsageCommand(cwd: string, projectsDir: string): Promise<strin
         env: { ...process.env, PATH: buildAugmentedPath() },
       },
       (error, stdout) => {
-        deleteSessionTranscript(projectsDir, sessionId)
         resolve(error ? null : stdout)
       }
     )

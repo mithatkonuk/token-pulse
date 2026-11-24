@@ -49,7 +49,7 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.claudeJsonPath = options.claudeJsonPath ?? path.join(home, '.claude.json')
     this.statuslineCachePath = options.statuslineCachePath ?? path.join(home, '.claude', 'token-pulse-cache.json')
     this.projectsDir = options.projectsDir ?? path.join(home, '.claude', 'projects')
-    this.runUsageCommandFn = options.runUsageCommandFn ?? ((cwd) => runUsageCommand(cwd, this.projectsDir))
+    this.runUsageCommandFn = options.runUsageCommandFn ?? runUsageCommand
     this.isAvailableFn = options.isAvailableFn ?? isClaudeCliAvailable
     this.hasLocalDataFn =
       options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))

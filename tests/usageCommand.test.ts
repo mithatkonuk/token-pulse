@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -95,81 +96,44 @@ vi.mock('node:child_process', () => ({
 }))
 
 describe('runUsageCommand', () => {
-  let projectsDir: string
-
   beforeEach(() => {
     vi.clearAllMocks()
-    projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-pulse-usage-command-test-'))
   })
 
-  afterEach(() => {
-    fs.rmSync(projectsDir, { recursive: true, force: true })
-  })
-
-  it('resolves with stdout on success, passing a pinned --session-id', async () => {
-    const { execFile } = await import('node:child_process')
+  function mockExecFile(error: Error | null, stdout: string): void {
     vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
-      cb(null, 'usage output')
+      cb(error, stdout)
       return {} as ReturnType<typeof execFile>
     }) as typeof execFile)
+  }
 
-    const result = await runUsageCommand('/tmp', projectsDir)
+  it('resolves with stdout on success, and tells the CLI not to save a session to disk', async () => {
+    mockExecFile(null, 'usage output')
+
+    const result = await runUsageCommand('/tmp')
     expect(result).toBe('usage output')
     expect(execFile).toHaveBeenCalledWith(
       'claude',
-      ['-p', '/usage', '--session-id', expect.any(String), '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'],
+      ['-p', '/usage', '--no-session-persistence', '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'],
       expect.objectContaining({ cwd: '/tmp' }),
       expect.any(Function)
     )
   })
 
   it('augments PATH with common install locations, since a packaged app is launched without the shell PATH', async () => {
-    const { execFile } = await import('node:child_process')
-    vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
-      cb(null, 'usage output')
-      return {} as ReturnType<typeof execFile>
-    }) as typeof execFile)
+    mockExecFile(null, 'usage output')
 
-    await runUsageCommand('/tmp', projectsDir)
+    await runUsageCommand('/tmp')
     const callOpts = vi.mocked(execFile).mock.calls[0][2] as { env: Record<string, string | undefined> }
     expect(callOpts.env.PATH).toContain('/opt/homebrew/bin')
     expect(callOpts.env.PATH).toContain('/usr/local/bin')
   })
 
   it('resolves with null when the command fails', async () => {
-    const { execFile } = await import('node:child_process')
-    vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
-      cb(new Error('boom'), '')
-      return {} as ReturnType<typeof execFile>
-    }) as typeof execFile)
+    mockExecFile(new Error('boom'), '')
 
-    const result = await runUsageCommand('/tmp', projectsDir)
+    const result = await runUsageCommand('/tmp')
     expect(result).toBeNull()
-  })
-
-  it('deletes the session transcript file it created after reading the output', async () => {
-    const projectSubdir = path.join(projectsDir, 'some-project')
-    fs.mkdirSync(projectSubdir)
-    const { execFile } = await import('node:child_process')
-    vi.mocked(execFile).mockImplementation(((_cmd: string, args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
-      const sessionId = args[args.indexOf('--session-id') + 1]
-      fs.writeFileSync(path.join(projectSubdir, `${sessionId}.jsonl`), '{}')
-      cb(null, 'usage output')
-      return {} as ReturnType<typeof execFile>
-    }) as typeof execFile)
-
-    await runUsageCommand('/tmp', projectsDir)
-    expect(fs.readdirSync(projectSubdir)).toEqual([])
-  })
-
-  it('does not throw when the transcript file was never created (e.g. the command errored before writing)', async () => {
-    const { execFile } = await import('node:child_process')
-    vi.mocked(execFile).mockImplementation(((_cmd: string, _args: string[], _opts: object, cb: (error: Error | null, stdout: string) => void) => {
-      cb(new Error('boom'), '')
-      return {} as ReturnType<typeof execFile>
-    }) as typeof execFile)
-
-    await expect(runUsageCommand('/tmp', projectsDir)).resolves.toBeNull()
   })
 })
 
