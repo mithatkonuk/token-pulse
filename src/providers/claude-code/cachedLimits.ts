@@ -151,3 +151,16 @@ export function readClaudeJsonLimits(parsed: unknown, now: number, timeZone?: st
     timeZone
   )
 }
+
+// Returns the time of the last successful usage fetch of the signed-in account, or null when
+// claude.json does not tell it.
+export function readUsageCacheTime(parsed: unknown): number | null {
+  if (!isRecord(parsed) || !isRecord(parsed.oauthAccount) || !isRecord(parsed.cachedUsageUtilization)) {
+    return null
+  }
+  const cache = parsed.cachedUsageUtilization
+  if (cache.accountUuid !== parsed.oauthAccount.accountUuid || typeof cache.fetchedAtMs !== 'number') {
+    return null
+  }
+  return Number.isFinite(cache.fetchedAtMs) ? cache.fetchedAtMs : null
+}

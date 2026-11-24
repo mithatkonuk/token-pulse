@@ -18,7 +18,7 @@ import {
   computeImmediateRefreshFloorMs,
   lastRefreshAtAfterCache,
   ACTIVE_INTERVAL_MS,
-  NEAR_LIMIT_INTERVAL_MS,
+  FILE_ACTIVITY_MIN_INTERVAL_MS,
   IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
   type UsageCommandScheduleConfig,
 } from '../src/main/usageCommandScheduler'
@@ -167,16 +167,12 @@ function onWatchedFileActivity(source: SourceRuntime): void {
   // lastRefreshAt to their fetch time. Then the floor below skips the subprocess. A cache that only
   // repeats our own last `/usage` result does not do that, so the bars do not freeze on it.
   poll(source)
-  // A watched file changing means Claude was just actually used — that's a far more direct signal
-  // than "wait for the next 3-minute tick," so check the real usage command now instead of only
-  // refreshing the cheap cached display fields. Floored at NEAR_LIMIT_INTERVAL_MS rather than the
-  // tighter IMMEDIATE_REFRESH_MIN_INTERVAL_MS used for tray-open: file writes happen continuously
-  // during an active session (every streamed turn), so a 15s floor would re-spawn the usage-check
-  // subprocess nearly 4x a minute for the whole session — busier than even the dedicated near-cap
-  // fast path, which defeats the point of that path being the "watching most closely" cadence.
+  // A watched file change means that Claude is in use now, so refresh before the next scheduled
+  // tick. The floor is wider than the one for a click, because files change all the time during a
+  // session.
   refreshUsageFromCommandNow(source, {
     trigger: 'file-activity',
-    minIntervalMs: NEAR_LIMIT_INTERVAL_MS,
+    minIntervalMs: FILE_ACTIVITY_MIN_INTERVAL_MS,
     userTriggered: false,
   })
 }

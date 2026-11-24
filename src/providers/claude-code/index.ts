@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ContextWindow } from '../../shared/types'
 import type { CachedLimits, CachedUsage, CommandUsageResult, UsageProvider } from '../types'
-import { readClaudeJsonLimits, readStatuslineLimits } from './cachedLimits'
+import { readClaudeJsonLimits, readStatuslineLimits, readUsageCacheTime } from './cachedLimits'
 import { getContextWindowSizeForModel } from './modelContextWindows'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from './transcript'
 import { parseUsageOutput, runUsageCommand, isClaudeCliAvailable } from './usageCommand'
@@ -185,9 +185,18 @@ export class ClaudeCodeProvider implements UsageProvider {
     }
   }
 
+  // When the usage endpoint gives an error (for example 429), `/usage` prints the cached limits of
+  // the CLI and does not update the cache. Thus, a cache that is older than this call shows that
+  // the output is old. A null result makes the caller use its failure backoff.
+  private isStaleOutput(startedAt: number): boolean {
+    const fetchedAtMs = readUsageCacheTime(readJsonFile(this.claudeJsonPath))
+    return fetchedAtMs !== null && fetchedAtMs < startedAt
+  }
+
   async getUsageFromCommand(cwd: string): Promise<CommandUsageResult | null> {
+    const startedAt = this.nowFn()
     const stdout = await this.runUsageCommandFn(cwd)
-    if (stdout === null) {
+    if (stdout === null || this.isStaleOutput(startedAt)) {
       return null
     }
     const parsed = parseUsageOutput(stdout)

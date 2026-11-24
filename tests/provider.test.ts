@@ -227,6 +227,44 @@ Last 7d · 3998 requests · 9 sessions
       const p = provider(async () => null)
       expect(await p.getUsageFromCommand('/some/cwd')).toBeNull()
     })
+
+    // When the usage endpoint gives 429, the CLI prints its old cached limits and does not update
+    // `cachedUsageUtilization`. Then the output looks valid but is old.
+    describe('stale output check', () => {
+      const runAt = Date.parse('2026-11-24T10:42:00Z')
+
+      function writeUsageCache(fetchedAtMs: number): void {
+        fs.writeFileSync(
+          claudeJsonPath,
+          JSON.stringify({
+            oauthAccount: { accountUuid: 'account-a' },
+            cachedUsageUtilization: { fetchedAtMs, accountUuid: 'account-a', utilization: {} },
+          })
+        )
+      }
+
+      function providerWith(run: () => Promise<string | null>) {
+        return new ClaudeCodeProvider({ claudeJsonPath, statuslineCachePath, projectsDir, runUsageCommandFn: run, nowFn: () => runAt })
+      }
+
+      it('rejects output when the CLI cache did not update', async () => {
+        writeUsageCache(runAt - 45 * 60_000)
+        expect(await providerWith(async () => USAGE_TEXT).getUsageFromCommand('/cwd')).toBeNull()
+      })
+
+      it('accepts output when the CLI cache updated', async () => {
+        writeUsageCache(runAt - 45 * 60_000)
+        const run = async (): Promise<string> => {
+          writeUsageCache(runAt + 2_000)
+          return USAGE_TEXT
+        }
+        expect(await providerWith(run).getUsageFromCommand('/cwd')).not.toBeNull()
+      })
+
+      it('accepts output when claude.json has no usage cache', async () => {
+        expect(await providerWith(async () => USAGE_TEXT).getUsageFromCommand('/cwd')).not.toBeNull()
+      })
+    })
   })
 })
 

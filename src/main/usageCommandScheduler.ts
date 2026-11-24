@@ -7,7 +7,12 @@ export const IDLE_THRESHOLD_MS = 15 * 60 * 1000
 // Sitting at (or near) the cap is exactly the moment someone is watching most closely, so the
 // ambient active/idle cadence isn't good enough there either — override both with a short cadence
 // until usage drops back below the threshold (e.g. the window resets).
-export const NEAR_LIMIT_INTERVAL_MS = 30 * 1000
+// The usage endpoint is shared by all Claude clients of the account, and it gives 429 when they
+// ask too often. Then the CLI prints old cached limits. Thus these cadences stay at 2 minutes.
+export const NEAR_LIMIT_INTERVAL_MS = 2 * 60 * 1000
+// Floor for the refresh that a watched file change starts. Files change many times each minute
+// during a session, so this floor sets how often an active session calls the endpoint.
+export const FILE_ACTIVITY_MIN_INTERVAL_MS = 2 * 60 * 1000
 // Opening the panel, or a watched session file actually changing, are direct signals that the
 // numbers are being read or the source is being used right now — the scheduled cadence isn't
 // good enough there: the bars would otherwise be up to ACTIVE_INTERVAL_MS old, or IDLE_INTERVAL_MS
