@@ -15,6 +15,15 @@ const DEFAULT_MODEL_WEIGHT = 3
 const MAX_REMEMBERED_REPLIES = 5000
 // A reply that started just before prime() can have an earlier timestamp. This margin still counts it.
 const START_MARGIN_MS = 60 * 1000
+// At startup, the scanner reads each transcript backwards in chunks of this size, and stops at
+// replies older than the start time. Recent transcripts can be hundreds of megabytes.
+const DEFAULT_CHUNK_BYTES = 1024 * 1024
+const TIMESTAMP_FIELD = /"timestamp":"([^"]+)"/
+
+function lineTime(line: string): number {
+  const match = TIMESTAMP_FIELD.exec(line)
+  return match ? Date.parse(match[1]) : NaN
+}
 
 function modelWeight(model: unknown): number {
   const family = typeof model === 'string' ? model.replace(/^claude-/, '').split('-')[0] : ''
@@ -86,18 +95,68 @@ export class ReplyScanner {
 
   constructor(
     private readonly projectsDir: string,
-    private readonly accepts: EntrypointFilter = () => true
+    private readonly accepts: EntrypointFilter = () => true,
+    private readonly chunkBytes: number = DEFAULT_CHUNK_BYTES
   ) {}
 
-  // Starts each existing transcript at its current end, so that old replies are not counted.
-  prime(): void {
-    this.notBefore = Date.now() - START_MARGIN_MS
+  // Starts each existing transcript at its current end, so that later reads count only new replies.
+  // With a start time, it also returns the cost of the replies since that time: then the estimate
+  // after a restart includes the replies since the last good fetch.
+  prime(since?: number): number {
+    this.notBefore = since ?? Date.now() - START_MARGIN_MS
+    let total = 0
     for (const file of this.listTranscripts(this.projectsDir)) {
       try {
-        this.offsets.set(file, fs.statSync(file).size)
+        const { size, mtimeMs } = fs.statSync(file)
+        this.offsets.set(file, size)
+        if (since !== undefined && mtimeMs >= since) {
+          total += this.readBackTo(file, size, since)
+        }
       } catch {
         // The file was removed after the directory read.
       }
+    }
+    return total
+  }
+
+  // Reads the file backwards from `end` and adds up the replies until a line is older than `since`.
+  private readBackTo(file: string, end: number, since: number): number {
+    const fd = fs.openSync(file, 'r')
+    try {
+      let total = 0
+      let position = end
+      let carry = Buffer.alloc(0)
+      while (position > 0) {
+        const start = Math.max(0, position - this.chunkBytes)
+        const chunk = Buffer.alloc(position - start)
+        fs.readSync(fd, chunk, 0, chunk.length, start)
+        const buffer = Buffer.concat([chunk, carry])
+        position = start
+        // The first line of a chunk can start in the previous chunk. It waits for the next read.
+        const firstNewline = start > 0 ? buffer.indexOf(0x0a) : -1
+        if (start > 0 && firstNewline === -1) {
+          carry = buffer
+          continue
+        }
+        carry = buffer.subarray(0, Math.max(0, firstNewline))
+        const lines = buffer.subarray(firstNewline + 1).toString('utf-8').split('\n')
+        let reachedOld = false
+        for (const line of lines) {
+          if (lineTime(line) < since) {
+            reachedOld = true
+          }
+          const reply = parseReply(line, since, this.accepts)
+          if (reply !== null) {
+            total += this.addReply(reply)
+          }
+        }
+        if (reachedOld) {
+          return total
+        }
+      }
+      return total
+    } finally {
+      fs.closeSync(fd)
     }
   }
 

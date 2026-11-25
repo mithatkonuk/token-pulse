@@ -52,6 +52,9 @@ fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
 
 const logUsageAttempt = createUsageLog(path.join(app.getPath('userData'), 'logs', 'usage.log'))
 
+// At startup the replies since the last good fetch are counted, but not more than one 5h window.
+const MAX_STARTUP_LOOKBACK_MS = 5 * 60 * 60 * 1000
+
 // The learned estimate rate of each source. It is kept, so that a restart does not need new fetches
 // before the estimate works again. This file is in the token-pulse folder, not in a Claude folder.
 const ESTIMATE_RATES_PATH = path.join(app.getPath('userData'), 'usage-estimate.json')
@@ -472,7 +475,14 @@ app.whenReady().then(() => {
     }
   }, nativeTheme.shouldUseDarkColors, sources.length > 0)
   nativeTheme.on('updated', pushState)
-  sources.forEach((source) => source.provider.primeActivity?.())
+  // The first poll sets the last known value (also an old cache) as the start of the estimate.
+  // Then the replies since that fetch are added, so that a restart does not lose them.
+  sources.forEach(poll)
+  sources.forEach((source) => {
+    const fetchedAt = state.usageBySource[source.id].cacheUpdatedAt
+    const since = fetchedAt === null ? undefined : Math.max(Date.parse(fetchedAt), Date.now() - MAX_STARTUP_LOOKBACK_MS)
+    source.activityCost += source.provider.primeActivity?.(since) ?? 0
+  })
   sources.forEach(poll)
   const now = Date.now()
   sources.forEach((s) => startRefresh(s, now, 'startup'))

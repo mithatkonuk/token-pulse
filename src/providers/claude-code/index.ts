@@ -71,8 +71,8 @@ export class ClaudeCodeProvider implements UsageProvider {
     return [this.statuslineCachePath, this.claudeJsonPath, this.projectsDir]
   }
 
-  primeActivity(): void {
-    this.replyScanner.prime()
+  primeActivity(since?: number): number {
+    return this.replyScanner.prime(since)
   }
 
   readActivity(changedPath: string): number | null {

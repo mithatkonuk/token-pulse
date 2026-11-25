@@ -27,7 +27,8 @@ export interface UsageProvider {
   getCachedUsage(): CachedUsage
   getUsageFromCommand(cwd: string): Promise<CommandUsageResult | null>
   // Optional. Marks the current end of each local activity file, so that old activity is not counted.
-  primeActivity?(): void
+  // With a start time, it returns the cost of the activity since that time.
+  primeActivity?(since?: number): number
   // Optional. Returns the cost of new local activity in a changed file, or null when the file is
   // not an activity file.
   readActivity?(changedPath: string): number | null

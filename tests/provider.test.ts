@@ -294,6 +294,13 @@ describe('ClaudeCodeProvider reply activity', () => {
     expect(p.readActivity(file)).toBe(0)
   })
 
+  it('counts replies since a start time', () => {
+    const file = path.join(projectsDir, 'project', 'earlier.jsonl')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, line + '\n')
+    expect(provider().primeActivity(Date.now() - 60_000)).toBeGreaterThan(0)
+  })
+
   it('returns null for a file outside the projects folder', () => {
     expect(provider().readActivity(claudeJsonPath)).toBeNull()
   })

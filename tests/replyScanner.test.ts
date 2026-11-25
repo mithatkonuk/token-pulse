@@ -142,4 +142,42 @@ describe('ReplyScanner', () => {
     fs.writeFileSync(file, reply('a'))
     expect(scanner.readFile(file)).toBe(0)
   })
+
+  describe('prime with a start time', () => {
+    const since = Date.now() - 30 * 60 * 1000
+    const before = new Date(since - 60_000).toISOString()
+    const after = new Date(since + 60_000).toISOString()
+    const cost = weighUsage('claude-sonnet-5-5', USAGE)
+
+    it('counts replies since that time', () => {
+      const file = transcriptPath('project', 'session.jsonl')
+      fs.writeFileSync(file, reply('old', USAGE, 'claude-sonnet-5-5', before) + reply('new', USAGE, 'claude-sonnet-5-5', after))
+      expect(new ReplyScanner(dir).prime(since)).toBeCloseTo(cost)
+    })
+
+    it('reads a long file in many chunks', () => {
+      const file = transcriptPath('project', 'session.jsonl')
+      const lines = [reply('old', USAGE, 'claude-sonnet-5-5', before)]
+      for (let i = 0; i < 20; i++) {
+        lines.push(reply(`new-${i}`, USAGE, 'claude-sonnet-5-5', after))
+      }
+      fs.writeFileSync(file, lines.join(''))
+      expect(new ReplyScanner(dir, () => true, 64).prime(since)).toBeCloseTo(20 * cost)
+    })
+
+    it('does not count those replies again', () => {
+      const file = transcriptPath('project', 'session.jsonl')
+      fs.writeFileSync(file, reply('new', USAGE, 'claude-sonnet-5-5', after))
+      const scanner = new ReplyScanner(dir)
+      scanner.prime(since)
+      fs.appendFileSync(file, reply('new'))
+      expect(scanner.readFile(file)).toBe(0)
+    })
+
+    it('returns zero without a start time', () => {
+      const file = transcriptPath('project', 'session.jsonl')
+      fs.writeFileSync(file, reply('a'))
+      expect(new ReplyScanner(dir).prime()).toBe(0)
+    })
+  })
 })
