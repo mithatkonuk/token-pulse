@@ -40,7 +40,10 @@ interface Reply {
   cost: number
 }
 
-function parseReply(line: string, notBefore: number): Reply | null {
+// Tells if a reply from this app (the `entrypoint` field, for example `claude-desktop`) is counted.
+export type EntrypointFilter = (entrypoint: string | null) => boolean
+
+function parseReply(line: string, notBefore: number, accepts: EntrypointFilter): Reply | null {
   let entry: unknown
   try {
     entry = JSON.parse(line)
@@ -54,10 +57,14 @@ function parseReply(line: string, notBefore: number): Reply | null {
     type?: unknown
     requestId?: unknown
     timestamp?: unknown
+    entrypoint?: unknown
     message?: { id?: unknown; model?: unknown; usage?: unknown }
   }
   const usage = e.message?.usage
   if (e.type !== 'assistant' || typeof usage !== 'object' || usage === null) {
+    return null
+  }
+  if (!accepts(typeof e.entrypoint === 'string' ? e.entrypoint : null)) {
     return null
   }
   // A resumed session copies the old replies into a new file. Their timestamps are old, so they
@@ -77,7 +84,10 @@ export class ReplyScanner {
   private readonly costs = new Map<string, number>()
   private notBefore = Date.now() - START_MARGIN_MS
 
-  constructor(private readonly projectsDir: string) {}
+  constructor(
+    private readonly projectsDir: string,
+    private readonly accepts: EntrypointFilter = () => true
+  ) {}
 
   // Starts each existing transcript at its current end, so that old replies are not counted.
   prime(): void {
@@ -102,7 +112,7 @@ export class ReplyScanner {
     }
     let total = 0
     for (const line of text.split('\n')) {
-      const reply = parseReply(line, this.notBefore)
+      const reply = parseReply(line, this.notBefore, this.accepts)
       if (reply !== null) {
         total += this.addReply(reply)
       }

@@ -20,9 +20,10 @@ function reply(
   requestId: string,
   usage: Record<string, number> = USAGE,
   model = 'claude-sonnet-5-5',
-  timestamp = new Date().toISOString()
+  timestamp = new Date().toISOString(),
+  entrypoint = 'claude-vscode'
 ): string {
-  return JSON.stringify({ type: 'assistant', requestId, timestamp, message: { id: `msg-${requestId}`, model, usage } }) + '\n'
+  return JSON.stringify({ type: 'assistant', requestId, timestamp, entrypoint, message: { id: `msg-${requestId}`, model, usage } }) + '\n'
 }
 
 function transcriptPath(...parts: string[]): string {
@@ -114,6 +115,15 @@ describe('ReplyScanner', () => {
     const file = transcriptPath('project', 'resumed.jsonl')
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
     fs.writeFileSync(file, reply('old', USAGE, 'claude-sonnet-5-5', hourAgo) + reply('new'))
+    expect(scanner.readFile(file)).toBeCloseTo(weighUsage('claude-sonnet-5-5', USAGE))
+  })
+
+  it('counts only replies from accepted apps', () => {
+    const scanner = new ReplyScanner(dir, (entrypoint) => entrypoint === 'claude-desktop')
+    scanner.prime()
+    const file = transcriptPath('project', 'session.jsonl')
+    const now = new Date().toISOString()
+    fs.writeFileSync(file, reply('ext') + reply('desk', USAGE, 'claude-sonnet-5-5', now, 'claude-desktop'))
     expect(scanner.readFile(file)).toBeCloseTo(weighUsage('claude-sonnet-5-5', USAGE))
   })
 

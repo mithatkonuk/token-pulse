@@ -285,6 +285,15 @@ describe('ClaudeCodeProvider reply activity', () => {
     expect(p.readActivity(file)).toBeGreaterThan(0)
   })
 
+  it('skips replies from Claude Desktop, which has its own login', () => {
+    const p = provider()
+    p.primeActivity()
+    const file = path.join(projectsDir, 'project', 'desktop.jsonl')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(line), entrypoint: 'claude-desktop' }) + '\n')
+    expect(p.readActivity(file)).toBe(0)
+  })
+
   it('returns null for a file outside the projects folder', () => {
     expect(provider().readActivity(claudeJsonPath)).toBeNull()
   })

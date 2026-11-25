@@ -9,6 +9,10 @@ import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLast
 import { parseUsageOutput, runUsageCommand, isClaudeCliAvailable } from './usageCommand'
 import { ReplyScanner } from './replyScanner'
 
+// Claude Desktop sends its own login to its sessions, not the `~/.claude.json` login that this
+// provider reports. Its replies are in the same projects folder, so they are skipped here.
+const DESKTOP_ENTRYPOINT = 'claude-desktop'
+
 interface StatuslineCache {
   model_display_name?: unknown
   context_window?: {
@@ -56,7 +60,7 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.hasLocalDataFn =
       options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))
     this.nowFn = options.nowFn ?? Date.now
-    this.replyScanner = new ReplyScanner(this.projectsDir)
+    this.replyScanner = new ReplyScanner(this.projectsDir, (entrypoint) => entrypoint !== DESKTOP_ENTRYPOINT)
   }
 
   isAvailable(): boolean {
