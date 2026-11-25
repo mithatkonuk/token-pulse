@@ -20,6 +20,8 @@ function baseUsage(): SourceUsage {
     recentActivity: null,
     updatedAt: new Date().toISOString(),
     cacheUpdatedAt: null,
+    estimatedPercent: null,
+    lastCheckFailed: false,
   }
 }
 

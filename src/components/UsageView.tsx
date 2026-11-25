@@ -153,7 +153,11 @@ export function UsageView({ state }: { state: SourceUsage }) {
       {state.cacheUpdatedAt && (
         <>
           <hr className="widget-panel__separator" />
-          <div className="widget-panel__freshness">Data as of {formatRelativeTime(state.cacheUpdatedAt)}</div>
+          <div className="widget-panel__freshness">
+            Data as of {formatRelativeTime(state.cacheUpdatedAt)}
+            {state.estimatedPercent !== null && ` · about ${state.estimatedPercent}% now, estimated from local replies`}
+            {state.lastCheckFailed && ' · last check got old data, retrying later'}
+          </div>
         </>
       )}
     </>

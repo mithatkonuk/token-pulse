@@ -41,6 +41,9 @@ token-pulse never asks you to create a credential. It reuses the Anthropic sessi
 
 - **Two usage bars** — 5-hour and weekly rate-limit percentage, with the plain-language reset time Claude Code itself reports
 - **Tray title tells you which window you're looking at** — the menu-bar percentage is suffixed with `5h`, `Wk`, or (for Cursor) `Mo`, so it's never ambiguous which limit is closest to being hit
+- **Live estimate between fetches** — the usage endpoint can only be asked every few minutes. Between two fetches, token-pulse reads the new replies in your local transcripts (terminal, Cursor extension, Desktop) and estimates the 5h percentage from their token cost. It learns the rate (percent for each cost unit) from earlier fetches and keeps it in `usage-estimate.json` in its own folder. The estimate does not see claude.ai or other machines, so the next fetch corrects it.
+- **A tilde (`~48% 5h`) marks a value that is not a recent confirmed fetch** — an estimate, data older than 15 minutes, or a last check that got old data. The panel tells which one.
+- **0% at the reset time** — when the 5h window resets, the tray shows 0% immediately. It does not wait for the next fetch.
 - **What's using your limits** — a 24h/7d breakdown of top skills, subagents, plugins, and MCP servers, straight from `/usage`
 - **Context window usage** — current conversation's token usage against the model's context window, when available
 - **Cursor as a second source** — when Cursor is installed and logged in, the header becomes a clickable selector to switch between "Claude Code" and "Cursor"; Cursor's view shows its monthly billing-cycle % and reset date, cost spent vs. plan limit, and a recent-activity list (model, tokens, cost) for your last few requests. If no Cursor session is found, the header looks exactly as it always has — no dropdown, no visual change.

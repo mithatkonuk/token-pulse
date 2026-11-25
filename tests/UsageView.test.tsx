@@ -20,6 +20,8 @@ function baseState(overrides: Partial<SourceUsage> = {}): SourceUsage {
     recentActivity: null,
     updatedAt: new Date().toISOString(),
     cacheUpdatedAt: null,
+    estimatedPercent: null,
+    lastCheckFailed: false,
     ...overrides,
   }
 }
@@ -68,5 +70,19 @@ describe('UsageView', () => {
   it('shows no signed-in row when the account email is null', () => {
     render(<UsageView state={baseState()} />)
     expect(screen.queryByText('Signed in as')).not.toBeInTheDocument()
+  })
+
+  describe('freshness line', () => {
+    const fetchedAt = new Date().toISOString()
+
+    it('shows the estimate since the last fetch', () => {
+      render(<UsageView state={baseState({ cacheUpdatedAt: fetchedAt, estimatedPercent: 48 })} />)
+      expect(screen.getByText(/about 48% now, estimated from local replies/)).toBeInTheDocument()
+    })
+
+    it('tells when the last check got old data', () => {
+      render(<UsageView state={baseState({ cacheUpdatedAt: fetchedAt, lastCheckFailed: true })} />)
+      expect(screen.getByText(/last check got old data/)).toBeInTheDocument()
+    })
   })
 })

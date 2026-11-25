@@ -41,7 +41,12 @@ export function createTray(
   return tray
 }
 
-export function updateTrayIcon(percentUsed: number | null, isDarkMode: boolean, windowLabel: TrayWindowLabel = null): void {
+export function updateTrayIcon(
+  percentUsed: number | null,
+  isDarkMode: boolean,
+  windowLabel: TrayWindowLabel = null,
+  approximate = false
+): void {
   // A watcher/interval callback can still be in flight when quit tears down the native Tray —
   // the module-level reference stays non-null, so `isDestroyed()` is the only real guard.
   if (!tray || tray.isDestroyed()) {
@@ -49,7 +54,7 @@ export function updateTrayIcon(percentUsed: number | null, isDarkMode: boolean, 
   }
   tray.setImage(nativeImage.createFromBuffer(renderUsageRingPng(percentUsed ?? 0, ICON_SIZE, isDarkMode)))
   if (process.platform === 'darwin') {
-    tray.setTitle(trayTitleFor(percentUsed, windowLabel))
+    tray.setTitle(trayTitleFor(percentUsed, windowLabel, approximate))
   }
 }
 

@@ -4,13 +4,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
 import { createTray, updateTrayIcon } from './tray'
-import { trayWindowLabelForWindowId } from '../src/main/trayTitle'
+import { trayWindowLabelForWindowId, isDataOld } from '../src/main/trayTitle'
 import { togglePopup, showPopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
 import { CursorProvider } from '../src/providers/cursor'
 import type { UsageProvider } from '../src/providers/types'
-import type { AppState, AppSettings, SourceUsage } from '../src/shared/types'
+import type { AppState, AppSettings, SourceUsage, UsageWindow } from '../src/shared/types'
 import { readSettings, writeSettings } from '../src/main/settingsStore'
 import {
   shouldRefreshUsageCommand,
@@ -27,6 +27,8 @@ import { computeBackoffIntervalMs } from '../src/main/cursorBackoff'
 import { computeResetRefreshDelayMs } from '../src/main/resetTimestamp'
 import { isNearLimit } from '../src/main/nearLimit'
 import { buildAvailableSources, type SourceConfig } from '../src/main/buildSources'
+import { dropEndedWindow, keepHigherInSameWindow, resetWindow } from '../src/main/windowMerge'
+import { EMPTY_ESTIMATE, estimatePercent, recordConfirmed, type EstimateState } from '../src/main/usageEstimate'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -51,6 +53,33 @@ fs.mkdirSync(USAGE_COMMAND_CWD, { recursive: true })
 
 const logUsageAttempt = createUsageLog(path.join(app.getPath('userData'), 'logs', 'usage.log'))
 
+// The learned estimate rate of each source. It is kept, so that a restart does not need new fetches
+// before the estimate works again. This file is in the token-pulse folder, not in a Claude folder.
+const ESTIMATE_RATES_PATH = path.join(app.getPath('userData'), 'usage-estimate.json')
+
+function readEstimateRates(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(ESTIMATE_RATES_PATH, 'utf-8')) as unknown
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {}
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0)
+    )
+  } catch {
+    return {}
+  }
+}
+
+function saveEstimateRates(): void {
+  const rates = Object.fromEntries(sources.flatMap((s) => (s.estimate.rate === null ? [] : [[s.id, s.estimate.rate]])))
+  try {
+    fs.writeFileSync(ESTIMATE_RATES_PATH, JSON.stringify(rates))
+  } catch {
+    // The estimate still works in this run. It only learns again after a restart.
+  }
+}
+
 interface SourceRuntime {
   id: string
   label: string
@@ -61,6 +90,11 @@ interface SourceRuntime {
   consecutiveFailures: number
   refreshInFlight: boolean
   resetRefreshTimer: NodeJS.Timeout | null
+  // The cost of local replies since startup. The estimate compares it with confirmed values.
+  activityCost: number
+  estimate: EstimateState
+  // The reset text of the 5h window that ended last. Old data for that window shows as zero.
+  endedResetsText: string | null
 }
 
 // Both providers are probed for availability the same way — no special-casing either one.
@@ -70,6 +104,8 @@ const sourceConfigs: SourceConfig[] = [
   { id: 'claude', label: 'Claude Code', provider: new ClaudeCodeProvider() },
   { id: 'cursor', label: 'Cursor', provider: new CursorProvider(), activeIntervalMs: CURSOR_ACTIVE_INTERVAL_MS },
 ]
+
+const savedRates = readEstimateRates()
 
 const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((config) => ({
   id: config.id,
@@ -81,6 +117,9 @@ const sources: SourceRuntime[] = buildAvailableSources(sourceConfigs).map((confi
   consecutiveFailures: 0,
   refreshInFlight: false,
   resetRefreshTimer: null,
+  activityCost: 0,
+  estimate: { ...EMPTY_ESTIMATE, rate: savedRates[config.id] ?? null },
+  endedResetsText: null,
 }))
 
 function emptySourceUsage(): SourceUsage {
@@ -95,6 +134,8 @@ function emptySourceUsage(): SourceUsage {
     recentActivity: null,
     updatedAt: new Date().toISOString(),
     cacheUpdatedAt: null,
+    estimatedPercent: null,
+    lastCheckFailed: false,
   }
 }
 
@@ -121,7 +162,9 @@ function pushState(): void {
       activeUsage.windows.find((w) => w.id === 'five_hour') ?? activeUsage.windows.find((w) => w.id !== 'weekly')
     if (primaryWindow) {
       const windowLabel = trayWindowLabelForWindowId(primaryWindow.id)
-      updateTrayIcon(primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel)
+      const estimate = primaryWindow.id === 'five_hour' ? activeUsage.estimatedPercent : null
+      const approximate = estimate !== null || activeUsage.lastCheckFailed || isDataOld(activeUsage.cacheUpdatedAt, Date.now())
+      updateTrayIcon(estimate ?? primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel, approximate)
     }
   }
   const popup = getPopupIfExists()
@@ -134,6 +177,24 @@ function pushState(): void {
 // than the limits on the panel replace them, so an old cache never hides a new `/usage` result.
 function isNewerThan(fetchedAt: string, current: string | null): boolean {
   return current === null || Date.parse(fetchedAt) > Date.parse(current)
+}
+
+// Merges confirmed limits into the shown limits, and gives the 5h value to the estimate.
+function confirmLimits(source: SourceRuntime, windows: UsageWindow[]): UsageWindow[] {
+  const incomingFiveHour = windows.find((w) => w.id === 'five_hour')
+  if (incomingFiveHour?.resetsText != null && incomingFiveHour.resetsText !== source.endedResetsText) {
+    source.endedResetsText = null
+  }
+  const merged = keepHigherInSameWindow(state.usageBySource[source.id].windows, dropEndedWindow(windows, source.endedResetsText))
+  const fiveHour = merged.find((w) => w.id === 'five_hour')
+  if (fiveHour) {
+    const oldRate = source.estimate.rate
+    source.estimate = recordConfirmed(source.estimate, { percent: fiveHour.percentUsed, resetsText: fiveHour.resetsText }, source.activityCost)
+    if (source.estimate.rate !== oldRate) {
+      saveEstimateRates()
+    }
+  }
+  return merged
 }
 
 function poll(source: SourceRuntime): void {
@@ -152,24 +213,34 @@ function poll(source: SourceRuntime): void {
         currentModel: cached.currentModel,
         contextWindow: cached.contextWindow,
         updatedAt: new Date().toISOString(),
-        ...(cachedLimits === null ? {} : { windows: cachedLimits.windows, cacheUpdatedAt: cachedLimits.fetchedAt }),
+        ...(cachedLimits === null
+          ? {}
+          : { windows: confirmLimits(source, cachedLimits.windows), cacheUpdatedAt: cachedLimits.fetchedAt, lastCheckFailed: false }),
+        estimatedPercent: estimatePercent(source.estimate, source.activityCost),
       },
     },
   }
   pushState()
   if (cachedLimits !== null) {
-    scheduleResetRefresh(source, cachedLimits.windows)
+    scheduleResetRefresh(source, state.usageBySource[source.id].windows)
   }
 }
 
-function onWatchedFileActivity(source: SourceRuntime): void {
+function onWatchedFileActivity(source: SourceRuntime, changedPath: string): void {
+  const replyCost = source.provider.readActivity?.(changedPath) ?? null
+  if (replyCost !== null) {
+    source.activityCost += replyCost
+  }
   // When a cache holds new limits from another Claude Code process, poll() shows them and moves
-  // lastRefreshAt to their fetch time. Then the floor below skips the subprocess. A cache that only
-  // repeats our own last `/usage` result does not do that, so the bars do not freeze on it.
+  // lastRefreshAt to their fetch time. Then the floor below skips the subprocess. poll() also
+  // updates the estimate with the new reply cost.
   poll(source)
-  // A watched file change means that Claude is in use now, so refresh before the next scheduled
-  // tick. The floor is wider than the one for a click, because files change all the time during a
-  // session.
+  // A provider that reads replies refreshes only for a new reply, because only a reply uses the
+  // limits. Other changes, for example our own `/usage` call that writes claude.json, do not
+  // start a refresh. A provider without a reply reader refreshes for each change.
+  if (source.provider.readActivity !== undefined && !(replyCost !== null && replyCost > 0)) {
+    return
+  }
   refreshUsageFromCommandNow(source, {
     trigger: 'file-activity',
     minIntervalMs: FILE_ACTIVITY_MIN_INTERVAL_MS,
@@ -270,11 +341,29 @@ function scheduleResetRefresh(source: SourceRuntime, windows: SourceUsage['windo
   }
   source.resetRefreshTimer = setTimeout(() => {
     source.resetRefreshTimer = null
+    // The window has reset, so show 0% now. The fetch below gives the new reset time.
+    const usage = state.usageBySource[source.id]
+    source.endedResetsText = usage.windows.find((w) => w.id === 'five_hour')?.resetsText ?? null
+    source.estimate = recordConfirmed(source.estimate, { percent: 0, resetsText: null }, source.activityCost)
+    state = {
+      ...state,
+      usageBySource: { ...state.usageBySource, [source.id]: { ...usage, windows: resetWindow(usage.windows, 'five_hour'), estimatedPercent: null } },
+    }
+    pushState()
     if (source.refreshInFlight) {
       return
     }
     startRefresh(source, Date.now(), 'reset-boundary')
   }, delayMs)
+}
+
+function markCheckFailed(source: SourceRuntime): void {
+  source.consecutiveFailures += 1
+  const usage = state.usageBySource[source.id]
+  if (!usage.lastCheckFailed) {
+    state = { ...state, usageBySource: { ...state.usageBySource, [source.id]: { ...usage, lastCheckFailed: true } } }
+    pushState()
+  }
 }
 
 async function refreshUsageFromCommand(source: SourceRuntime, trigger: UsageLogTrigger): Promise<void> {
@@ -291,7 +380,7 @@ async function refreshUsageFromCommand(source: SourceRuntime, trigger: UsageLogT
   try {
     const result = await source.provider.getUsageFromCommand(USAGE_COMMAND_CWD)
     if (result === null) {
-      source.consecutiveFailures += 1
+      markCheckFailed(source)
       record('empty')
       return
     }
@@ -304,7 +393,9 @@ async function refreshUsageFromCommand(source: SourceRuntime, trigger: UsageLogT
         ...state.usageBySource,
         [source.id]: {
           ...existing,
-          windows: result.windows,
+          windows: confirmLimits(source, result.windows),
+          estimatedPercent: estimatePercent(source.estimate, source.activityCost),
+          lastCheckFailed: false,
           contributing: result.contributing,
           cost: result.cost,
           recentActivity: result.recentActivity,
@@ -313,12 +404,12 @@ async function refreshUsageFromCommand(source: SourceRuntime, trigger: UsageLogT
       },
     }
     pushState()
-    scheduleResetRefresh(source, result.windows)
+    scheduleResetRefresh(source, state.usageBySource[source.id].windows)
   } catch {
     // A provider throwing (e.g. fetch rejecting on a network-level failure — offline, DNS,
     // TLS) must not become an unhandled rejection in the main process; treat it the same as
     // an explicit null result so the failure backoff still engages.
-    source.consecutiveFailures += 1
+    markCheckFailed(source)
     record('error')
   } finally {
     source.refreshInFlight = false
@@ -388,6 +479,7 @@ app.whenReady().then(() => {
     }
   }, nativeTheme.shouldUseDarkColors, sources.length > 0)
   nativeTheme.on('updated', pushState)
+  sources.forEach((source) => source.provider.primeActivity?.())
   sources.forEach(poll)
   const now = Date.now()
   sources.forEach((s) => startRefresh(s, now, 'startup'))
@@ -398,8 +490,8 @@ app.whenReady().then(() => {
         atomic: true,
         awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
       })
-      .on('add', () => onWatchedFileActivity(source))
-      .on('change', () => onWatchedFileActivity(source))
+      .on('add', (changedPath) => onWatchedFileActivity(source, changedPath))
+      .on('change', (changedPath) => onWatchedFileActivity(source, changedPath))
   })
   setInterval(() => sources.forEach(poll), FALLBACK_POLL_MS)
   setInterval(() => sources.forEach(maybeRefreshUsageFromCommand), FALLBACK_POLL_MS)

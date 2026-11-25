@@ -7,6 +7,7 @@ import { readClaudeJsonLimits, readStatuslineLimits, readUsageCacheTime } from '
 import { getContextWindowSizeForModel } from './modelContextWindows'
 import { findNewestTranscript, formatModelDisplayName, readLastModelId, readLastUsage } from './transcript'
 import { parseUsageOutput, runUsageCommand, isClaudeCliAvailable } from './usageCommand'
+import { ReplyScanner } from './replyScanner'
 
 interface StatuslineCache {
   model_display_name?: unknown
@@ -43,6 +44,7 @@ export class ClaudeCodeProvider implements UsageProvider {
   private readonly isAvailableFn: () => boolean
   private readonly hasLocalDataFn: () => boolean
   private readonly nowFn: () => number
+  private readonly replyScanner: ReplyScanner
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     const home = os.homedir()
@@ -54,6 +56,7 @@ export class ClaudeCodeProvider implements UsageProvider {
     this.hasLocalDataFn =
       options.hasLocalDataFn ?? (() => fs.existsSync(this.claudeJsonPath) || fs.existsSync(this.projectsDir))
     this.nowFn = options.nowFn ?? Date.now
+    this.replyScanner = new ReplyScanner(this.projectsDir)
   }
 
   isAvailable(): boolean {
@@ -62,6 +65,18 @@ export class ClaudeCodeProvider implements UsageProvider {
 
   getWatchedPaths(): string[] {
     return [this.statuslineCachePath, this.claudeJsonPath, this.projectsDir]
+  }
+
+  primeActivity(): void {
+    this.replyScanner.prime()
+  }
+
+  readActivity(changedPath: string): number | null {
+    const relative = path.relative(this.projectsDir, changedPath)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return null
+    }
+    return this.replyScanner.readFile(changedPath)
   }
 
   getPlanTier(): string | null {

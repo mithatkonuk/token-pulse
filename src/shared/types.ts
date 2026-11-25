@@ -62,6 +62,11 @@ export interface SourceUsage {
   recentActivity: UsageEvent[] | null
   updatedAt: string
   cacheUpdatedAt: string | null
+  // The 5h percentage estimated from local replies since the last fetch, or null when there is no
+  // estimate above the fetched value.
+  estimatedPercent: number | null
+  // True when the last usage check failed or returned old data.
+  lastCheckFailed: boolean
 }
 
 export interface SourceDescriptor {

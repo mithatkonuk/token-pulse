@@ -14,6 +14,8 @@ function usageWithWindows(windows: SourceUsage['windows']): SourceUsage {
     recentActivity: null,
     updatedAt: new Date(0).toISOString(),
     cacheUpdatedAt: null,
+    estimatedPercent: null,
+    lastCheckFailed: false,
   }
 }
 

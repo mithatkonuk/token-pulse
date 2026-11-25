@@ -268,6 +268,28 @@ Last 7d · 3998 requests · 9 sessions
   })
 })
 
+describe('ClaudeCodeProvider reply activity', () => {
+  const line = JSON.stringify({
+    type: 'assistant',
+    requestId: 'req-1',
+    timestamp: new Date().toISOString(),
+    message: { model: 'claude-sonnet-5-5', usage: { output_tokens: 100 } },
+  })
+
+  it('reads the cost of new replies in a transcript', () => {
+    const p = provider()
+    p.primeActivity()
+    const file = path.join(projectsDir, 'project', 'session.jsonl')
+    fs.mkdirSync(path.dirname(file))
+    fs.writeFileSync(file, line + '\n')
+    expect(p.readActivity(file)).toBeGreaterThan(0)
+  })
+
+  it('returns null for a file outside the projects folder', () => {
+    expect(provider().readActivity(claudeJsonPath)).toBeNull()
+  })
+})
+
 describe('ClaudeCodeProvider cached limits', () => {
   const now = Date.parse('2026-11-23T13:40:00Z')
   const account = 'account-a'
