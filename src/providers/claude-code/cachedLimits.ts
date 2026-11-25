@@ -1,9 +1,10 @@
 import type { UsageWindow } from '../../shared/types'
 import type { CachedLimits } from '../types'
 
-// Claude Code writes the usage limits to disk in two places. Token-pulse reads them first, because
-// a file read is fast and costs no subprocess. A value older than this maximum age is not
-// trusted: the `claude -p /usage` command gets the limits instead.
+// Claude Code writes the usage limits to disk in two places. Token-pulse reads them, because a file
+// read is fast and costs no subprocess. A cache older than this maximum age is used only while its
+// 5-hour window is open. Then, when the endpoint gives 429 after a restart, the tray shows the last
+// known value, marked as old, and not a false 0%.
 export const CACHED_LIMITS_MAX_AGE_MS = 5 * 60 * 1000
 
 interface LimitValue {
@@ -16,7 +17,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isFresh(fetchedAtMs: number, now: number): boolean {
-  return Number.isFinite(fetchedAtMs) && now - fetchedAtMs <= CACHED_LIMITS_MAX_AGE_MS
+  return now - fetchedAtMs <= CACHED_LIMITS_MAX_AGE_MS
 }
 
 // The `/usage` command writes the reset time as "Nov 23 at 6pm (Europe/Berlin)", in the local zone
@@ -99,9 +100,14 @@ function buildLimits(
   fiveHour: LimitValue | null | undefined,
   weekly: LimitValue | null | undefined,
   fetchedAtMs: number,
+  now: number,
   timeZone?: string
 ): CachedLimits | null {
-  if (fiveHour === undefined || weekly === undefined) {
+  if (fiveHour === undefined || weekly === undefined || !Number.isFinite(fetchedAtMs)) {
+    return null
+  }
+  const windowOpen = fiveHour !== null && fiveHour.resetsAt.getTime() > now
+  if (!isFresh(fetchedAtMs, now) && !windowOpen) {
     return null
   }
   const windows = toWindows(fiveHour, weekly, timeZone)
@@ -116,13 +122,11 @@ export function readStatuslineLimits(parsed: unknown, now: number, timeZone?: st
     return null
   }
   const fetchedAtMs = typeof parsed.updated_at === 'string' ? Date.parse(parsed.updated_at) : NaN
-  if (!isFresh(fetchedAtMs, now)) {
-    return null
-  }
   return buildLimits(
     readLimitValue(parsed.five_hour, 'used_percentage', unixSecondsToDate),
     readLimitValue(parsed.seven_day, 'used_percentage', unixSecondsToDate),
     fetchedAtMs,
+    now,
     timeZone
   )
 }
@@ -141,13 +145,14 @@ export function readClaudeJsonLimits(parsed: unknown, now: number, timeZone?: st
     return null
   }
   const fetchedAtMs = typeof cache.fetchedAtMs === 'number' ? cache.fetchedAtMs : NaN
-  if (!isFresh(fetchedAtMs, now) || !isRecord(cache.utilization)) {
+  if (!isRecord(cache.utilization)) {
     return null
   }
   return buildLimits(
     readLimitValue(cache.utilization.five_hour, 'utilization', isoToDate),
     readLimitValue(cache.utilization.seven_day, 'utilization', isoToDate),
     fetchedAtMs,
+    now,
     timeZone
   )
 }

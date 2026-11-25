@@ -182,14 +182,16 @@ export class ClaudeCodeProvider implements UsageProvider {
     }
   }
 
-  // The statusline cache comes first, because its fields come from the documented statusline input.
-  // The `cachedUsageUtilization` field in claude.json is not documented, so it comes second.
+  // The newer cache wins. The statusline cache is written by an interactive terminal session only,
+  // so it is often older than the cache in claude.json.
   private getLimitsFromCaches(): CachedLimits | null {
     const now = this.nowFn()
-    return (
-      readStatuslineLimits(readJsonFile(this.statuslineCachePath), now) ??
-      readClaudeJsonLimits(readJsonFile(this.claudeJsonPath), now)
-    )
+    const statusline = readStatuslineLimits(readJsonFile(this.statuslineCachePath), now)
+    const claudeJson = readClaudeJsonLimits(readJsonFile(this.claudeJsonPath), now)
+    if (statusline === null || claudeJson === null) {
+      return statusline ?? claudeJson
+    }
+    return Date.parse(claudeJson.fetchedAt) > Date.parse(statusline.fetchedAt) ? claudeJson : statusline
   }
 
   getCachedUsage(): CachedUsage {

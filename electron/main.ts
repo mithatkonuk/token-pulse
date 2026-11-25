@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
 import { createTray, updateTrayIcon } from './tray'
-import { trayWindowLabelForWindowId, isDataOld } from '../src/main/trayTitle'
+import { trayWindowLabelForWindowId, isApproximate } from '../src/main/trayTitle'
 import { togglePopup, showPopup, getPopupIfExists, POPUP_WIDTH } from './windowManager'
 import { setStartAtLogin, getStartAtLogin } from './autostart'
 import { ClaudeCodeProvider } from '../src/providers/claude-code'
@@ -18,7 +18,6 @@ import {
   computeImmediateRefreshFloorMs,
   lastRefreshAtAfterCache,
   ACTIVE_INTERVAL_MS,
-  FILE_ACTIVITY_MIN_INTERVAL_MS,
   IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
   type UsageCommandScheduleConfig,
 } from '../src/main/usageCommandScheduler'
@@ -163,7 +162,7 @@ function pushState(): void {
     if (primaryWindow) {
       const windowLabel = trayWindowLabelForWindowId(primaryWindow.id)
       const estimate = primaryWindow.id === 'five_hour' ? activeUsage.estimatedPercent : null
-      const approximate = estimate !== null || activeUsage.lastCheckFailed || isDataOld(activeUsage.cacheUpdatedAt, Date.now())
+      const approximate = isApproximate({ estimatedPercent: estimate, fetchedAt: activeUsage.cacheUpdatedAt }, Date.now())
       updateTrayIcon(estimate ?? primaryWindow.percentUsed, nativeTheme.shouldUseDarkColors, windowLabel, approximate)
     }
   }
@@ -241,11 +240,7 @@ function onWatchedFileActivity(source: SourceRuntime, changedPath: string): void
   if (source.provider.readActivity !== undefined && !(replyCost !== null && replyCost > 0)) {
     return
   }
-  refreshUsageFromCommandNow(source, {
-    trigger: 'file-activity',
-    minIntervalMs: FILE_ACTIVITY_MIN_INTERVAL_MS,
-    userTriggered: false,
-  })
+  refreshUsageFromCommandNow(source, { trigger: 'file-activity', userTriggered: false })
 }
 
 function maybeRefreshUsageFromCommand(source: SourceRuntime): void {
@@ -286,18 +281,16 @@ function startRefresh(source: SourceRuntime, now: number, trigger: UsageLogTrigg
 
 interface ImmediateRefreshOptions {
   trigger: UsageLogTrigger
-  minIntervalMs?: number
   // Defaults to true: every trigger but watched-file activity is a one-shot event with someone
   // right there looking at the panel, so it gets the capped backoff rather than the full one.
   userTriggered?: boolean
 }
 
-// Every direct signal that the source is being used right now — a click, a wake, a watched file
-// changing — jumps the ambient 3-10 minute cadence. minIntervalMs keeps a burst of those from
-// spawning a subprocess per event; callers pick their own, since file activity fires continuously
-// during a session while a click does not.
+// Every direct signal that the source is in use now (a click, a wake, a new reply) jumps the
+// ambient 3-10 minute cadence. IMMEDIATE_REFRESH_MIN_INTERVAL_MS stops a burst of these signals
+// from asking the rate-limited endpoint again and again.
 function refreshUsageFromCommandNow(source: SourceRuntime, options: ImmediateRefreshOptions): void {
-  const { trigger, minIntervalMs = IMMEDIATE_REFRESH_MIN_INTERVAL_MS, userTriggered = true } = options
+  const { trigger, userTriggered = true } = options
   // This is activity, so a source that had gone idle must not stay on the idle cadence for its
   // next scheduled refresh either.
   source.lastActivityAt = Date.now()
@@ -309,7 +302,7 @@ function refreshUsageFromCommandNow(source: SourceRuntime, options: ImmediateRef
     return
   }
   const floorMs = computeImmediateRefreshFloorMs({
-    minIntervalMs,
+    minIntervalMs: IMMEDIATE_REFRESH_MIN_INTERVAL_MS,
     backoffMs: computeBackoffIntervalMs(source.activeIntervalMs ?? ACTIVE_INTERVAL_MS, consecutiveFailures),
     consecutiveFailures,
     userTriggered,

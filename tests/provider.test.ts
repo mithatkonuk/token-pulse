@@ -332,16 +332,16 @@ describe('ClaudeCodeProvider cached limits', () => {
     expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(31)
   })
 
-  it('prefers the statusline cache, because its fields are documented', () => {
+  it('uses the newer of the two caches', () => {
     writeClaudeJsonCache(31)
     writeStatuslineCache(29)
-    expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(29)
+    // claude.json is 10s old and the statusline cache is 20s old.
+    expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(31)
   })
 
-  it('uses claude.json when the statusline cache is too old', () => {
-    writeClaudeJsonCache(31)
+  it('uses the statusline cache when claude.json has no limits', () => {
     writeStatuslineCache(29)
-    expect(providerAt(now + 285_000).getCachedUsage().limits?.windows[0].percentUsed).toBe(31)
+    expect(providerAt(now).getCachedUsage().limits?.windows[0].percentUsed).toBe(29)
   })
 
   it('returns null limits when claude.json is not valid JSON', () => {

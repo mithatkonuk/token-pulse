@@ -10,15 +10,10 @@ export const IDLE_THRESHOLD_MS = 15 * 60 * 1000
 // The usage endpoint is shared by all Claude clients of the account, and it gives 429 when they
 // ask too often. Then the CLI prints old cached limits. Thus these cadences stay at 2 minutes.
 export const NEAR_LIMIT_INTERVAL_MS = 2 * 60 * 1000
-// Floor for the refresh that a watched file change starts. Files change many times each minute
-// during a session, so this floor sets how often an active session calls the endpoint.
-export const FILE_ACTIVITY_MIN_INTERVAL_MS = 2 * 60 * 1000
-// Opening the panel, or a watched session file actually changing, are direct signals that the
-// numbers are being read or the source is being used right now — the scheduled cadence isn't
-// good enough there: the bars would otherwise be up to ACTIVE_INTERVAL_MS old, or IDLE_INTERVAL_MS
-// old if nobody had touched a session in a while. This floor only exists to stop a burst of
-// triggers (repeated tray clicks, a flurry of file writes) from spawning a subprocess each.
-export const IMMEDIATE_REFRESH_MIN_INTERVAL_MS = 15 * 1000
+// Floor for each refresh that an event starts: a new reply, a panel click, a wake or a source
+// switch. On 2026-11-25 a click 74 seconds after a fetch got 429, and the CLI then stopped for
+// 58 minutes. Data that is less than 2 minutes old is current enough for the panel.
+export const IMMEDIATE_REFRESH_MIN_INTERVAL_MS = 2 * 60 * 1000
 
 export interface UsageCommandScheduleState {
   now: number
@@ -61,7 +56,7 @@ export function shouldRefreshImmediately(
 // the background cadence but wrong for a human who just opened the panel: at the top of the
 // backoff that lockout is an hour long, so the bars stay frozen with no way to recover short of
 // restarting the app. Clicks get the backoff capped here instead; background triggers keep it.
-export const USER_TRIGGERED_MAX_FLOOR_MS = 60 * 1000
+export const USER_TRIGGERED_MAX_FLOOR_MS = 5 * 60 * 1000
 
 export interface ImmediateRefreshFloorState {
   minIntervalMs: number

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTrayTitle, trayWindowLabelForWindowId, trayTitleFor, isDataOld } from '../src/main/trayTitle'
+import { formatTrayTitle, trayWindowLabelForWindowId, trayTitleFor, isDataOld, isApproximate } from '../src/main/trayTitle'
 
 describe('formatTrayTitle', () => {
   it('shows just the percentage when no window label is given', () => {
@@ -73,5 +73,22 @@ describe('isDataOld', () => {
 
   it('treats missing data as current', () => {
     expect(isDataOld(null, now)).toBe(false)
+  })
+})
+
+describe('isApproximate', () => {
+  const now = Date.parse('2026-11-25T12:00:00Z')
+  const recent = '2026-11-25T11:57:00Z'
+
+  it('marks an estimate', () => {
+    expect(isApproximate({ estimatedPercent: 18, fetchedAt: recent }, now)).toBe(true)
+  })
+
+  it('marks old data', () => {
+    expect(isApproximate({ estimatedPercent: null, fetchedAt: '2026-11-25T11:40:00Z' }, now)).toBe(true)
+  })
+
+  it('does not mark recent confirmed data', () => {
+    expect(isApproximate({ estimatedPercent: null, fetchedAt: recent }, now)).toBe(false)
   })
 })

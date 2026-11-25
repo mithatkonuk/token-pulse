@@ -29,3 +29,9 @@ export const OLD_DATA_AFTER_MS = 15 * 60 * 1000
 export function isDataOld(fetchedAt: string | null, now: number): boolean {
   return fetchedAt !== null && now - Date.parse(fetchedAt) > OLD_DATA_AFTER_MS
 }
+
+// A failed check alone does not mark the tray: the shown value is still recent. If the checks
+// keep failing, the data becomes old and the mark appears. The panel tells about the failed check.
+export function isApproximate(usage: { estimatedPercent: number | null; fetchedAt: string | null }, now: number): boolean {
+  return usage.estimatedPercent !== null || isDataOld(usage.fetchedAt, now)
+}

@@ -50,9 +50,14 @@ describe('readStatuslineLimits', () => {
     })
   })
 
-  it('returns null when the cache is older than the maximum age', () => {
+  it('keeps an old cache while its 5-hour window is open', () => {
     const old = statusline({ updated_at: new Date(NOW - CACHED_LIMITS_MAX_AGE_MS - 1).toISOString() })
-    expect(readStatuslineLimits(old, NOW)).toBeNull()
+    expect(readStatuslineLimits(old, NOW)?.windows[0].percentUsed).toBe(23)
+  })
+
+  it('returns null for an old cache after its 5-hour window reset', () => {
+    const old = statusline({ updated_at: new Date(NOW - CACHED_LIMITS_MAX_AGE_MS - 1).toISOString() })
+    expect(readStatuslineLimits(old, FIVE_HOUR_RESET + 1)).toBeNull()
   })
 
   it('returns null when the cache has no time', () => {
@@ -114,8 +119,14 @@ describe('readClaudeJsonLimits', () => {
     expect(readClaudeJsonLimits({ cachedUsageUtilization: claudeJson().cachedUsageUtilization }, NOW)).toBeNull()
   })
 
-  it('returns null when the cache is older than the maximum age', () => {
-    expect(readClaudeJsonLimits(claudeJson({ fetchedAtMs: NOW - CACHED_LIMITS_MAX_AGE_MS - 1 }), NOW)).toBeNull()
+  it('keeps an old cache while its 5-hour window is open', () => {
+    const old = claudeJson({ fetchedAtMs: NOW - CACHED_LIMITS_MAX_AGE_MS - 1 })
+    expect(readClaudeJsonLimits(old, NOW)?.windows[0].percentUsed).toBe(31)
+  })
+
+  it('returns null for an old cache after its 5-hour window reset', () => {
+    const old = claudeJson({ fetchedAtMs: NOW - CACHED_LIMITS_MAX_AGE_MS - 1 })
+    expect(readClaudeJsonLimits(old, FIVE_HOUR_RESET + 1)).toBeNull()
   })
 
   it('returns null when Claude Code changes the cache format', () => {
